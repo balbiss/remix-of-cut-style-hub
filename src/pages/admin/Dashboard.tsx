@@ -13,14 +13,21 @@ import {
 import { useAppointments } from '@/hooks/useAppointments';
 import { useServices } from '@/hooks/useServices';
 import { useProfessionals } from '@/hooks/useProfessionals';
+import { useBusinessHours } from '@/hooks/useBusinessHours';
+import { SetupChecklist } from '@/components/admin/SetupChecklist';
 import { format, parseISO } from 'date-fns';
 
 const AdminDashboard = () => {
   const { appointments, loading: loadingAppointments } = useAppointments({ date: new Date() });
   const { services, loading: loadingServices } = useServices();
   const { professionals, loading: loadingProfessionals } = useProfessionals();
+  const { hasBusinessHoursConfigured, loading: loadingHours } = useBusinessHours();
 
-  const loading = loadingAppointments || loadingServices || loadingProfessionals;
+  const loading = loadingAppointments || loadingServices || loadingProfessionals || loadingHours;
+
+  // Check setup status
+  const hasProfessionals = professionals.filter(p => p.ativo).length > 0;
+  const hasServices = services.filter(s => s.ativo).length > 0;
 
   // Calculate stats from real data
   const todayAppointments = appointments.filter(a => a.status !== 'cancelled');
@@ -98,7 +105,14 @@ const AdminDashboard = () => {
           <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
             <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
             <span className="truncate">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
-          </div>
+        </div>
+
+        {/* Setup Checklist - only shows if incomplete */}
+        <SetupChecklist
+          hasProfessionals={hasProfessionals}
+          hasServices={hasServices}
+          hasBusinessHours={hasBusinessHoursConfigured}
+        />
         </div>
 
         {/* Stats Grid */}
