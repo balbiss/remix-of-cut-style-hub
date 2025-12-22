@@ -12,8 +12,9 @@ import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Professional } from '@/hooks/useProfessionals';
-import { User, Upload, X, Key, Mail } from 'lucide-react';
-
+import { User, Upload, X, Key, Mail, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 interface ProfessionalFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -42,6 +43,8 @@ export function ProfessionalForm({
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [creatingLogin, setCreatingLogin] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -57,6 +60,7 @@ export function ProfessionalForm({
       setCreateLogin(false);
       setLoginEmail(professional.email || '');
       setLoginPassword('');
+      setPendingFile(null);
     } else {
       setNome('');
       setTelefone('');
@@ -68,17 +72,41 @@ export function ProfessionalForm({
       setCreateLogin(false);
       setLoginEmail('');
       setLoginPassword('');
+      setPendingFile(null);
     }
   }, [professional, open]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const uploadAvatarToStorage = async (file: File): Promise<string | null> => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `professionals/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+    
+    const { data, error } = await supabase.storage
+      .from('logos')
+      .upload(fileName, file, { upsert: true });
+      
+    if (error) {
+      console.error('Error uploading avatar:', error);
+      toast.error('Erro ao fazer upload da foto');
+      return null;
+    }
+    
+    const { data: { publicUrl } } = supabase.storage
+      .from('logos')
+      .getPublicUrl(fileName);
+      
+    return publicUrl;
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 2 * 1024 * 1024) {
-        alert('Arquivo muito grande. Máximo 2MB.');
+        toast.error('Arquivo muito grande. Máximo 2MB.');
         return;
       }
 
+      // Store file for upload on save and show preview
+      setPendingFile(file);
       const reader = new FileReader();
       reader.onload = (event) => {
         setAvatarUrl(event.target?.result as string);
@@ -89,6 +117,7 @@ export function ProfessionalForm({
 
   const handleRemoveAvatar = () => {
     setAvatarUrl(null);
+    setPendingFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -97,12 +126,32 @@ export function ProfessionalForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    let finalAvatarUrl = avatarUrl;
+    
+    // Upload new avatar if pending
+    if (pendingFile) {
+      setUploadingAvatar(true);
+      const uploadedUrl = await uploadAvatarToStorage(pendingFile);
+      setUploadingAvatar(false);
+      
+      if (uploadedUrl) {
+        finalAvatarUrl = uploadedUrl;
+      } else {
+        return; // Don't save if upload failed
+      }
+    }
+    
+    // If avatarUrl is a base64 string (legacy), don't save it
+    if (finalAvatarUrl && finalAvatarUrl.startsWith('data:')) {
+      finalAvatarUrl = null;
+    }
+    
     onSave({
       nome,
       telefone,
       especialidade,
       ativo,
-      avatar_url: avatarUrl,
+      avatar_url: finalAvatarUrl,
       email: email || loginEmail,
       commission_percent: commissionPercent,
       schedule: professional?.schedule || null,
@@ -348,8 +397,13 @@ export function ProfessionalForm({
             >
               Cancelar
             </Button>
-            <Button type="submit" className="flex-1">
-              {professional ? 'Salvar' : 'Adicionar'}
+            <Button type="submit" className="flex-1" disabled={uploadingAvatar}>
+              {uploadingAvatar ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Enviando...
+                </>
+              ) : professional ? 'Salvar' : 'Adicionar'}
             </Button>
           </div>
         </form>
