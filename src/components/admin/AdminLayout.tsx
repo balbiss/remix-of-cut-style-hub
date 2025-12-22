@@ -106,7 +106,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         {/* Footer */}
         <div className="p-4 border-t border-sidebar-border space-y-2">
           <NavLink
-            to="/"
+            to={tenant?.slug ? `/agendar/${tenant.slug}` : '/'}
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ChevronLeft className="w-4 h-4" />
@@ -183,7 +183,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             {/* Footer */}
             <div className="p-4 border-t border-sidebar-border space-y-2">
               <NavLink
-                to="/"
+                to={tenant?.slug ? `/agendar/${tenant.slug}` : '/'}
                 onClick={() => setSidebarOpen(false)}
                 className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
