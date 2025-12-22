@@ -11,6 +11,7 @@ import { LoyaltyConfigForm } from '@/components/admin/LoyaltyConfigForm';
 import { LoyaltyRewardsForm } from '@/components/admin/LoyaltyRewardsForm';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDateBlocks } from '@/hooks/useDateBlocks';
+import { mockBusinessHours, mockBreakTime, BusinessHours, BreakTime, DateBlock } from '@/lib/mock-data';
 import {
   Settings as SettingsIcon,
   Link2,
@@ -26,49 +27,20 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-interface BusinessHours {
-  day: number;
-  isOpen: boolean;
-  openTime: string;
-  closeTime: string;
-}
-
-interface BreakTime {
-  enabled: boolean;
-  startTime: string;
-  endTime: string;
-}
-
-const defaultBusinessHours: BusinessHours[] = [
-  { day: 0, isOpen: false, openTime: '09:00', closeTime: '18:00' },
-  { day: 1, isOpen: true, openTime: '09:00', closeTime: '18:00' },
-  { day: 2, isOpen: true, openTime: '09:00', closeTime: '18:00' },
-  { day: 3, isOpen: true, openTime: '09:00', closeTime: '18:00' },
-  { day: 4, isOpen: true, openTime: '09:00', closeTime: '18:00' },
-  { day: 5, isOpen: true, openTime: '09:00', closeTime: '18:00' },
-  { day: 6, isOpen: true, openTime: '09:00', closeTime: '12:00' },
-];
-
-const defaultBreakTime: BreakTime = {
-  enabled: true,
-  startTime: '12:00',
-  endTime: '13:00',
-};
-
 const AdminSettings = () => {
   const { toast } = useToast();
   const { tenant } = useAuth();
   const { dateBlocks, addDateBlock, deleteDateBlock } = useDateBlocks();
   
   const [logoPreview, setLogoPreview] = useState<string | null>(tenant?.logo_url || null);
-  const [evolutionUrl, setEvolutionUrl] = useState(tenant?.evolution_api_url || '');
-  const [evolutionToken, setEvolutionToken] = useState(tenant?.evolution_api_token || '');
-  const [mpPublicKey, setMpPublicKey] = useState(tenant?.mp_public_key || '');
+  const [evolutionUrl, setEvolutionUrl] = useState('');
+  const [evolutionToken, setEvolutionToken] = useState('');
+  const [mpPublicKey, setMpPublicKey] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  // Schedule states
-  const [businessHours, setBusinessHours] = useState<BusinessHours[]>(defaultBusinessHours);
-  const [breakTime, setBreakTime] = useState<BreakTime>(defaultBreakTime);
+  // Schedule states - using mock-data types
+  const [businessHours, setBusinessHours] = useState<BusinessHours[]>(mockBusinessHours);
+  const [breakTime, setBreakTime] = useState<BreakTime>(mockBreakTime);
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -111,13 +83,31 @@ const AdminSettings = () => {
     });
   };
 
-  const handleAddDateBlock = async (block: { date: string; description: string; all_day: boolean; start_time?: string; end_time?: string }) => {
-    await addDateBlock(block);
+  const handleAddDateBlock = async (block: Omit<DateBlock, 'id'>) => {
+    await addDateBlock({
+      date: block.date,
+      description: block.description,
+      all_day: block.allDay,
+      start_time: block.startTime,
+      end_time: block.endTime,
+      professional_id: block.professionalId || null,
+    });
   };
 
   const handleRemoveDateBlock = async (id: string) => {
     await deleteDateBlock(id);
   };
+
+  // Convert Supabase dateBlocks to mock-data DateBlock format
+  const convertedDateBlocks: DateBlock[] = dateBlocks.map(b => ({
+    id: b.id,
+    date: b.date,
+    description: b.description,
+    allDay: b.all_day ?? true,
+    startTime: b.start_time ?? undefined,
+    endTime: b.end_time ?? undefined,
+    professionalId: b.professional_id ?? null,
+  }));
 
   return (
     <AdminLayout>
@@ -180,14 +170,7 @@ const AdminSettings = () => {
               />
 
               <DateBlockForm
-                dateBlocks={dateBlocks.map(b => ({
-                  id: b.id,
-                  date: b.date,
-                  description: b.description,
-                  all_day: b.all_day ?? true,
-                  start_time: b.start_time ?? undefined,
-                  end_time: b.end_time ?? undefined,
-                }))}
+                dateBlocks={convertedDateBlocks}
                 onAddBlock={handleAddDateBlock}
                 onRemoveBlock={handleRemoveDateBlock}
               />

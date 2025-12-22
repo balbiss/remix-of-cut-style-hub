@@ -1,7 +1,21 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Service, Professional } from '@/lib/mock-data';
 import { CreditCard, Banknote, Calendar, Clock, User, Scissors } from 'lucide-react';
+
+interface Professional {
+  id: string;
+  nome: string;
+  especialidade?: string | null;
+  avatar_url?: string | null;
+}
+
+interface Service {
+  id: string;
+  nome: string;
+  preco: number;
+  duracao: number;
+  descricao?: string | null;
+}
 
 interface PaymentStepProps {
   professional: Professional | undefined;
