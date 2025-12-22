@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/admin/ProtectedRoute";
 import { SuperAdminRoute } from "@/components/super-admin/SuperAdminRoute";
+import { BarberRoute } from "@/components/barber/BarberRoute";
 import Index from "./pages/Index";
 import Booking from "./pages/Booking";
 import Auth from "./pages/Auth";
@@ -17,8 +18,10 @@ import AdminClientes from "./pages/admin/Clientes";
 import AdminFinanceiro from "./pages/admin/Financeiro";
 import AdminProfissionais from "./pages/admin/Profissionais";
 import AdminServicos from "./pages/admin/Servicos";
+import AdminRelatorios from "./pages/admin/Relatorios";
 import SuperAdminDashboard from "./pages/super-admin/Dashboard";
 import SuperAdminTenants from "./pages/super-admin/Tenants";
+import BarberDashboard from "./pages/barber/Dashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -42,9 +45,11 @@ const App = () => (
             <Route path="/admin/servicos" element={<ProtectedRoute><AdminServicos /></ProtectedRoute>} />
             <Route path="/admin/clientes" element={<ProtectedRoute><AdminClientes /></ProtectedRoute>} />
             <Route path="/admin/financeiro" element={<ProtectedRoute><AdminFinanceiro /></ProtectedRoute>} />
+            <Route path="/admin/relatorios" element={<ProtectedRoute><AdminRelatorios /></ProtectedRoute>} />
             <Route path="/admin/configuracoes" element={<ProtectedRoute><AdminSettings /></ProtectedRoute>} />
             <Route path="/super-admin" element={<SuperAdminRoute><SuperAdminDashboard /></SuperAdminRoute>} />
             <Route path="/super-admin/tenants" element={<SuperAdminRoute><SuperAdminTenants /></SuperAdminRoute>} />
+            <Route path="/barbeiro" element={<BarberRoute><BarberDashboard /></BarberRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>

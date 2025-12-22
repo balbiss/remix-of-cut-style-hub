@@ -16,6 +16,7 @@ import {
   X,
   Scissors,
   LogOut,
+  FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useResponsive } from '@/hooks/use-responsive';
@@ -41,6 +42,7 @@ const navItems = [
   { to: '/admin/servicos', icon: Scissors, label: 'Serviços', end: false },
   { to: '/admin/clientes', icon: Users, label: 'Clientes', end: false },
   { to: '/admin/financeiro', icon: DollarSign, label: 'Financeiro', end: false },
+  { to: '/admin/relatorios', icon: FileText, label: 'Relatórios', end: false },
   { to: '/admin/configuracoes', icon: Settings, label: 'Configurações', end: false },
 ];
 

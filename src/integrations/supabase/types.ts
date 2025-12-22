@@ -507,7 +507,9 @@ export type Database = {
         Row: {
           ativo: boolean | null
           avatar_url: string | null
+          commission_percent: number | null
           created_at: string | null
+          email: string | null
           especialidade: string | null
           id: string
           nome: string
@@ -515,11 +517,14 @@ export type Database = {
           telefone: string | null
           tenant_id: string
           updated_at: string | null
+          user_id: string | null
         }
         Insert: {
           ativo?: boolean | null
           avatar_url?: string | null
+          commission_percent?: number | null
           created_at?: string | null
+          email?: string | null
           especialidade?: string | null
           id?: string
           nome: string
@@ -527,11 +532,14 @@ export type Database = {
           telefone?: string | null
           tenant_id: string
           updated_at?: string | null
+          user_id?: string | null
         }
         Update: {
           ativo?: boolean | null
           avatar_url?: string | null
+          commission_percent?: number | null
           created_at?: string | null
+          email?: string | null
           especialidade?: string | null
           id?: string
           nome?: string
@@ -539,6 +547,7 @@ export type Database = {
           telefone?: string | null
           tenant_id?: string
           updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -787,6 +796,10 @@ export type Database = {
         Returns: string
       }
       generate_referral_code: { Args: never; Returns: string }
+      get_professional_id_for_user: {
+        Args: { _user_id: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -812,6 +825,7 @@ export type Database = {
       }
       is_admin: { Args: { user_id: string }; Returns: boolean }
       is_admin_user: { Args: { user_id: string }; Returns: boolean }
+      is_barber: { Args: { _user_id: string }; Returns: boolean }
       is_tenant_active: { Args: { tenant_uuid: string }; Returns: boolean }
     }
     Enums: {
