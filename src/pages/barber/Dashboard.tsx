@@ -1,14 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Scissors, DollarSign, Clock, CheckCircle, LogOut, Calendar } from 'lucide-react';
+import { Scissors, DollarSign, TrendingUp, CheckCircle, Calendar, User, Clock } from 'lucide-react';
 import { BarberLayout } from './Layout';
 
 interface Appointment {
@@ -35,7 +34,7 @@ interface Stats {
 }
 
 export default function BarberDashboard() {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const [professionalId, setProfessionalId] = useState<string | null>(null);
   const [professionalName, setProfessionalName] = useState<string>('');
   const [commissionPercent, setCommissionPercent] = useState<number>(50);
@@ -140,7 +139,6 @@ export default function BarberDashboard() {
     const monthStart = startOfMonth(today).toISOString();
     const monthEnd = endOfMonth(today).toISOString();
 
-    // Fetch completed appointments for stats
     const { data: completed } = await supabase
       .from('appointments')
       .select(`
@@ -203,120 +201,147 @@ export default function BarberDashboard() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'completed':
-        return <Badge className="bg-green-500">Realizado</Badge>;
+        return <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs">Realizado</Badge>;
       case 'cancelled':
-        return <Badge variant="destructive">Cancelado</Badge>;
+        return <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs">Cancelado</Badge>;
       case 'pending':
       default:
-        return <Badge variant="secondary">Pendente</Badge>;
+        return <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-xs">Pendente</Badge>;
     }
   };
 
+  const statsData = [
+    {
+      label: 'Hoje',
+      cuts: stats.todayCuts,
+      earnings: stats.todayEarnings,
+      icon: Calendar,
+      gradient: 'from-blue-500/20 to-cyan-500/20',
+      iconColor: 'text-cyan-400',
+    },
+    {
+      label: 'Semana',
+      cuts: stats.weekCuts,
+      earnings: stats.weekEarnings,
+      icon: Scissors,
+      gradient: 'from-purple-500/20 to-pink-500/20',
+      iconColor: 'text-purple-400',
+    },
+    {
+      label: 'Mês',
+      cuts: stats.monthCuts,
+      earnings: stats.monthEarnings,
+      icon: TrendingUp,
+      gradient: 'from-emerald-500/20 to-teal-500/20',
+      iconColor: 'text-emerald-400',
+    },
+  ];
+
   return (
     <BarberLayout professionalName={professionalName}>
-      <div className="space-y-6">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Hoje</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.todayCuts} cortes</div>
-              <p className="text-xs text-muted-foreground">
-                R$ {stats.todayEarnings.toFixed(2)} em comissão
-              </p>
-            </CardContent>
-          </Card>
+      <div className="space-y-4">
+        {/* Commission Badge */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
+            <DollarSign className="h-3.5 w-3.5 text-primary" />
+            <span className="text-xs font-medium text-primary">
+              Comissão: {commissionPercent}%
+            </span>
+          </div>
+          <span className="text-xs text-muted-foreground">
+            {format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })}
+          </span>
+        </div>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Esta Semana</CardTitle>
-              <Scissors className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.weekCuts} cortes</div>
-              <p className="text-xs text-muted-foreground">
-                R$ {stats.weekEarnings.toFixed(2)} em comissão
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Este Mês</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.monthCuts} cortes</div>
-              <p className="text-xs text-muted-foreground">
-                R$ {stats.monthEarnings.toFixed(2)} em comissão
-              </p>
-            </CardContent>
-          </Card>
+        {/* Compact Stats Row */}
+        <div className="grid grid-cols-3 gap-3">
+          {statsData.map((stat) => (
+            <Card key={stat.label} className={`relative overflow-hidden border-border/50 bg-gradient-to-br ${stat.gradient}`}>
+              <CardContent className="p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                    {stat.label}
+                  </span>
+                  <stat.icon className={`h-3.5 w-3.5 ${stat.iconColor}`} />
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-lg font-bold leading-none">{stat.cuts}</p>
+                  <p className="text-[10px] text-muted-foreground">cortes</p>
+                </div>
+                <div className="mt-2 pt-2 border-t border-border/30">
+                  <p className="text-sm font-semibold text-primary">
+                    R$ {stat.earnings.toFixed(2)}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
         {/* Today's Appointments */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Agendamentos de Hoje
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Card className="border-border/50">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Clock className="h-4 w-4 text-primary" />
+              <h3 className="font-semibold text-sm">Agendamentos de Hoje</h3>
+              <Badge variant="secondary" className="ml-auto text-xs">
+                {todayAppointments.length}
+              </Badge>
+            </div>
+
             {loading ? (
-              <p className="text-muted-foreground">Carregando...</p>
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent" />
+              </div>
             ) : todayAppointments.length === 0 ? (
-              <p className="text-muted-foreground">Nenhum agendamento para hoje</p>
+              <div className="text-center py-8 text-muted-foreground">
+                <Calendar className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">Nenhum agendamento para hoje</p>
+              </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {todayAppointments.map((apt) => (
                   <div
                     key={apt.id}
-                    className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-lg gap-4"
+                    className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/50 hover:bg-muted/50 transition-colors"
                   >
-                    <div className="flex-1 space-y-1">
+                    {/* Time */}
+                    <div className="flex-shrink-0 w-12 text-center">
+                      <span className="text-sm font-bold text-primary">
+                        {format(new Date(apt.data_hora), 'HH:mm')}
+                      </span>
+                    </div>
+
+                    {/* Divider */}
+                    <div className="w-px h-8 bg-border/50" />
+
+                    {/* Client & Service */}
+                    <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold">
-                          {format(new Date(apt.data_hora), 'HH:mm', { locale: ptBR })}
-                        </span>
+                        <User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                        <span className="text-sm font-medium truncate">{apt.cliente_nome}</span>
                         {getStatusBadge(apt.status)}
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        {apt.cliente_nome}
-                      </p>
-                      <p className="text-sm font-medium">
-                        {apt.service?.nome} - R$ {apt.service?.preco?.toFixed(2)}
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {apt.service?.nome} • <span className="text-primary font-medium">R$ {apt.service?.preco?.toFixed(2)}</span>
                       </p>
                     </div>
-                    
+
+                    {/* Action */}
                     {apt.status === 'pending' && (
                       <Button
+                        size="sm"
                         onClick={() => markAsCompleted(apt.id)}
-                        className="gap-2"
+                        className="flex-shrink-0 h-8 px-3 gap-1.5 text-xs"
                       >
-                        <CheckCircle className="h-4 w-4" />
-                        Marcar Realizado
+                        <CheckCircle className="h-3.5 w-3.5" />
+                        Concluir
                       </Button>
                     )}
                   </div>
                 ))}
               </div>
             )}
-          </CardContent>
-        </Card>
-
-        {/* Commission Info */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Sua Comissão</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">
-              Você recebe <span className="font-bold text-primary">{commissionPercent}%</span> do valor de cada serviço realizado.
-            </p>
           </CardContent>
         </Card>
       </div>
