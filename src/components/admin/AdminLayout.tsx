@@ -14,7 +14,6 @@ import {
   Settings,
   Menu,
   X,
-  ChevronLeft,
   Scissors,
   LogOut,
 } from 'lucide-react';
@@ -104,20 +103,13 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         </nav>
 
         {/* Footer */}
-        <div className="p-4 border-t border-sidebar-border space-y-2">
-          <NavLink
-            to={tenant?.slug ? `/agendar/${tenant.slug}` : '/'}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ChevronLeft className="w-4 h-4" />
-            Voltar ao Site
-          </NavLink>
+        <div className="p-4 border-t border-sidebar-border">
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2 text-sm text-destructive hover:text-destructive/80 transition-colors w-full"
+            className="flex items-center gap-3 px-4 py-3 rounded-lg text-destructive hover:bg-destructive/10 transition-all duration-200 w-full"
           >
-            <LogOut className="w-4 h-4" />
-            Sair
+            <LogOut className="w-5 h-5" />
+            <span>Sair</span>
           </button>
         </div>
       </aside>
@@ -181,21 +173,16 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             </nav>
 
             {/* Footer */}
-            <div className="p-4 border-t border-sidebar-border space-y-2">
-              <NavLink
-                to={tenant?.slug ? `/agendar/${tenant.slug}` : '/'}
-                onClick={() => setSidebarOpen(false)}
-                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4" />
-                Voltar ao Site
-              </NavLink>
+            <div className="p-4 border-t border-sidebar-border">
               <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 text-sm text-destructive hover:text-destructive/80 transition-colors w-full"
+                onClick={() => {
+                  setSidebarOpen(false);
+                  handleLogout();
+                }}
+                className="flex items-center gap-3 px-4 py-3 rounded-lg text-destructive hover:bg-destructive/10 transition-all duration-200 w-full"
               >
-                <LogOut className="w-4 h-4" />
-                Sair
+                <LogOut className="w-5 h-5" />
+                <span>Sair</span>
               </button>
             </div>
           </motion.aside>
