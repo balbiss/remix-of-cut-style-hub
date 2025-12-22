@@ -28,13 +28,21 @@ const signupSchema = z.object({
   path: ['confirmPassword'],
 });
 
+const forgotSchema = z.object({
+  email: z.string().email('Email inválido'),
+});
+
 type LoginFormData = z.infer<typeof loginSchema>;
 type SignupFormData = z.infer<typeof signupSchema>;
+type ForgotFormData = z.infer<typeof forgotSchema>;
+
+type AuthMode = 'login' | 'signup' | 'forgot';
 
 export default function Auth() {
-  const [isLogin, setIsLogin] = useState(true);
+  const [mode, setMode] = useState<AuthMode>('login');
   const [isLoading, setIsLoading] = useState(false);
-  const { user, signIn, signUp } = useAuth();
+  const [emailSent, setEmailSent] = useState(false);
+  const { user, signIn, signUp, resetPassword } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -44,6 +52,10 @@ export default function Auth() {
 
   const signupForm = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
+  });
+
+  const forgotForm = useForm<ForgotFormData>({
+    resolver: zodResolver(forgotSchema),
   });
 
   useEffect(() => {
@@ -103,7 +115,28 @@ export default function Auth() {
       title: 'Conta criada!',
       description: 'Verifique seu email para confirmar o cadastro. Ou desative a confirmação de email nas configurações do Supabase para testes.',
     });
-    setIsLogin(true);
+    setMode('login');
+  };
+
+  const handleForgotPassword = async (data: ForgotFormData) => {
+    setIsLoading(true);
+    const { error } = await resetPassword(data.email);
+    setIsLoading(false);
+
+    if (error) {
+      toast({
+        title: 'Erro',
+        description: 'Erro ao enviar email de recuperação',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setEmailSent(true);
+    toast({
+      title: 'Email enviado!',
+      description: 'Verifique sua caixa de entrada para redefinir sua senha',
+    });
   };
 
   return (
@@ -138,38 +171,41 @@ export default function Auth() {
             </div>
             <h1 className="text-2xl font-semibold text-foreground">BarberPro</h1>
             <p className="text-muted-foreground mt-2">
-              {isLogin ? 'Entre na sua conta' : 'Crie sua conta'}
+              {mode === 'login' && 'Entre na sua conta'}
+              {mode === 'signup' && 'Crie sua conta'}
+              {mode === 'forgot' && 'Recupere sua senha'}
             </p>
           </div>
 
           {/* Form container */}
           <div className="glass-premium rounded-2xl p-8">
-            {/* Tabs */}
-            <div className="flex gap-2 mb-8 p-1 bg-secondary rounded-lg">
-              <button
-                onClick={() => setIsLogin(true)}
-                className={`flex-1 py-2.5 rounded-md text-sm font-medium transition-all ${
-                  isLogin
-                    ? 'bg-gold text-primary-foreground shadow-md'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                Entrar
-              </button>
-              <button
-                onClick={() => setIsLogin(false)}
-                className={`flex-1 py-2.5 rounded-md text-sm font-medium transition-all ${
-                  !isLogin
-                    ? 'bg-gold text-primary-foreground shadow-md'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                Cadastrar
-              </button>
-            </div>
+            {mode !== 'forgot' && (
+              <div className="flex gap-2 mb-8 p-1 bg-secondary rounded-lg">
+                <button
+                  onClick={() => setMode('login')}
+                  className={`flex-1 py-2.5 rounded-md text-sm font-medium transition-all ${
+                    mode === 'login'
+                      ? 'bg-gold text-primary-foreground shadow-md'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Entrar
+                </button>
+                <button
+                  onClick={() => setMode('signup')}
+                  className={`flex-1 py-2.5 rounded-md text-sm font-medium transition-all ${
+                    mode === 'signup'
+                      ? 'bg-gold text-primary-foreground shadow-md'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Cadastrar
+                </button>
+              </div>
+            )}
 
             <AnimatePresence mode="wait">
-              {isLogin ? (
+              {mode === 'login' && (
                 <motion.form
                   key="login"
                   initial={{ opacity: 0, x: -20 }}
@@ -213,6 +249,16 @@ export default function Auth() {
                     )}
                   </div>
 
+                  <div className="text-right">
+                    <button
+                      type="button"
+                      onClick={() => setMode('forgot')}
+                      className="text-sm text-gold hover:underline"
+                    >
+                      Esqueceu sua senha?
+                    </button>
+                  </div>
+
                   <Button
                     type="submit"
                     disabled={isLoading}
@@ -225,7 +271,9 @@ export default function Auth() {
                     )}
                   </Button>
                 </motion.form>
-              ) : (
+              )}
+
+              {mode === 'signup' && (
                 <motion.form
                   key="signup"
                   initial={{ opacity: 0, x: 20 }}
@@ -332,6 +380,75 @@ export default function Auth() {
                     )}
                   </Button>
                 </motion.form>
+              )}
+
+              {mode === 'forgot' && (
+                <motion.div
+                  key="forgot"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {emailSent ? (
+                    <div className="text-center py-4">
+                      <div className="w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Mail className="w-8 h-8 text-green-500" />
+                      </div>
+                      <h3 className="text-lg font-medium text-foreground mb-2">Email enviado!</h3>
+                      <p className="text-muted-foreground text-sm mb-6">
+                        Verifique sua caixa de entrada e clique no link para redefinir sua senha.
+                      </p>
+                      <Button
+                        variant="outline"
+                        onClick={() => { setMode('login'); setEmailSent(false); }}
+                        className="w-full"
+                      >
+                        Voltar ao login
+                      </Button>
+                    </div>
+                  ) : (
+                    <form onSubmit={forgotForm.handleSubmit(handleForgotPassword)} className="space-y-5">
+                      <div className="space-y-2">
+                        <Label htmlFor="forgot-email" className="text-sm text-muted-foreground">Email</Label>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                          <Input
+                            id="forgot-email"
+                            type="email"
+                            placeholder="seu@email.com"
+                            className="pl-10 h-12 bg-secondary border-border focus:border-gold"
+                            {...forgotForm.register('email')}
+                          />
+                        </div>
+                        {forgotForm.formState.errors.email && (
+                          <p className="text-sm text-destructive">{forgotForm.formState.errors.email.message}</p>
+                        )}
+                      </div>
+
+                      <Button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full h-12 bg-gradient-to-r from-gold to-copper text-primary-foreground font-medium hover:opacity-90 transition-opacity"
+                      >
+                        {isLoading ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                          'Enviar link de recuperação'
+                        )}
+                      </Button>
+
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setMode('login')}
+                        className="w-full"
+                      >
+                        Voltar ao login
+                      </Button>
+                    </form>
+                  )}
+                </motion.div>
               )}
             </AnimatePresence>
           </div>
