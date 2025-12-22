@@ -815,7 +815,7 @@ export type Database = {
       is_tenant_active: { Args: { tenant_uuid: string }; Returns: boolean }
     }
     Enums: {
-      app_role: "admin" | "owner" | "super_admin"
+      app_role: "admin" | "owner" | "super_admin" | "barber"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -943,7 +943,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "owner", "super_admin"],
+      app_role: ["admin", "owner", "super_admin", "barber"],
     },
   },
 } as const
