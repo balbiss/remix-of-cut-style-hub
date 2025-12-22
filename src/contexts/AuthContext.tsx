@@ -31,7 +31,7 @@ interface AuthContextType {
   loading: boolean;
   isSubscriptionActive: boolean;
   signUp: (email: string, password: string, nome: string, barbeariaNome: string) => Promise<{ error: Error | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: Error | null; data: { user: User | null } | null }>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshTenant: () => Promise<void>;
@@ -157,12 +157,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
-    return { error: error as Error | null };
+    return { error: error as Error | null, data: data ? { user: data.user } : null };
   };
 
   const signOut = async () => {
