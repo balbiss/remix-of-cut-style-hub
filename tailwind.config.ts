@@ -1,0 +1,232 @@
+import type { Config } from "tailwindcss";
+
+export default {
+  darkMode: ["class"],
+  content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
+  prefix: "",
+  theme: {
+    container: {
+      center: true,
+      padding: "2rem",
+      screens: {
+        "2xl": "1400px",
+      },
+    },
+    extend: {
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        display: ['Oswald', 'system-ui', 'sans-serif'],
+      },
+      fontSize: {
+        'xs': ['0.75rem', { lineHeight: '1rem' }],
+        'sm': ['0.875rem', { lineHeight: '1.25rem' }],
+        'base': ['0.9375rem', { lineHeight: '1.5rem' }],
+        'lg': ['1.0625rem', { lineHeight: '1.75rem' }],
+        'xl': ['1.25rem', { lineHeight: '1.75rem' }],
+        '2xl': ['1.5rem', { lineHeight: '2rem' }],
+        '3xl': ['1.875rem', { lineHeight: '2.25rem' }],
+        '4xl': ['2.25rem', { lineHeight: '2.5rem' }],
+        '5xl': ['3rem', { lineHeight: '1.1' }],
+      },
+      colors: {
+        border: "hsl(var(--border))",
+        "border-subtle": "hsl(var(--border-subtle))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+          soft: "hsl(var(--primary-soft))",
+        },
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+        },
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
+        },
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+          hover: "hsl(var(--card-hover))",
+        },
+        sidebar: {
+          DEFAULT: "hsl(var(--sidebar-background))",
+          foreground: "hsl(var(--sidebar-foreground))",
+          primary: "hsl(var(--sidebar-primary))",
+          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
+          accent: "hsl(var(--sidebar-accent))",
+          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
+          border: "hsl(var(--sidebar-border))",
+          ring: "hsl(var(--sidebar-ring))",
+        },
+        gold: {
+          DEFAULT: "hsl(var(--gold))",
+          light: "hsl(var(--gold-light))",
+          dark: "hsl(var(--gold-dark))",
+          glow: "hsl(var(--gold-glow))",
+        },
+        copper: {
+          DEFAULT: "hsl(var(--copper))",
+          light: "hsl(var(--copper-light))",
+        },
+        charcoal: {
+          50: "hsl(var(--charcoal-50))",
+          100: "hsl(var(--charcoal-100))",
+          200: "hsl(var(--charcoal-200))",
+          300: "hsl(var(--charcoal-300))",
+          400: "hsl(var(--charcoal-400))",
+          500: "hsl(var(--charcoal-500))",
+          600: "hsl(var(--charcoal-600))",
+          700: "hsl(var(--charcoal-700))",
+          800: "hsl(var(--charcoal-800))",
+          900: "hsl(var(--charcoal-900))",
+          950: "hsl(var(--charcoal-950))",
+          DEFAULT: "hsl(var(--charcoal-800))",
+        },
+        midnight: "hsl(var(--midnight))",
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+          soft: "hsl(var(--success-soft))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+          soft: "hsl(var(--warning-soft))",
+        },
+        info: {
+          DEFAULT: "hsl(var(--info))",
+          foreground: "hsl(var(--info-foreground))",
+          soft: "hsl(var(--info-soft))",
+        },
+      },
+      spacing: {
+        '4.5': '1.125rem',
+        '5.5': '1.375rem',
+        '18': '4.5rem',
+        '22': '5.5rem',
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+        xl: "1rem",
+        "2xl": "1.25rem",
+        "3xl": "1.5rem",
+      },
+      keyframes: {
+        "accordion-down": {
+          from: { height: "0", opacity: "0" },
+          to: { height: "var(--radix-accordion-content-height)", opacity: "1" },
+        },
+        "accordion-up": {
+          from: { height: "var(--radix-accordion-content-height)", opacity: "1" },
+          to: { height: "0", opacity: "0" },
+        },
+        shimmer: {
+          "0%": { backgroundPosition: "-200% 0" },
+          "100%": { backgroundPosition: "200% 0" },
+        },
+        pulse: {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.5" },
+        },
+        "fade-in": {
+          "0%": { opacity: "0", transform: "translateY(10px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        "fade-up": {
+          "0%": { opacity: "0", transform: "translateY(20px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        "scale-in": {
+          "0%": { opacity: "0", transform: "scale(0.95)" },
+          "100%": { opacity: "1", transform: "scale(1)" },
+        },
+        "slide-in-right": {
+          "0%": { opacity: "0", transform: "translateX(20px)" },
+          "100%": { opacity: "1", transform: "translateX(0)" },
+        },
+        "slide-up": {
+          "0%": { opacity: "0", transform: "translateY(10px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        glow: {
+          "0%": { boxShadow: "0 0 20px hsl(43 74% 49% / 0.2)" },
+          "100%": { boxShadow: "0 0 40px hsl(43 74% 49% / 0.4)" },
+        },
+        "pulse-gold": {
+          "0%, 100%": { boxShadow: "0 0 0 0 hsl(43 74% 49% / 0.4)" },
+          "50%": { boxShadow: "0 0 0 8px hsl(43 74% 49% / 0)" },
+        },
+        float: {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-5px)" },
+        },
+        "border-beam": {
+          "100%": { offsetDistance: "100%" },
+        },
+      },
+      animation: {
+        "accordion-down": "accordion-down 0.2s ease-out",
+        "accordion-up": "accordion-up 0.2s ease-out",
+        shimmer: "shimmer 2s linear infinite",
+        pulse: "pulse 2s ease-in-out infinite",
+        "fade-in": "fade-in 0.3s ease-out",
+        "fade-up": "fade-up 0.5s ease-out",
+        "scale-in": "scale-in 0.2s ease-out",
+        "slide-in-right": "slide-in-right 0.3s ease-out",
+        "slide-up": "slide-up 0.4s ease-out",
+        glow: "glow 2s ease-in-out infinite alternate",
+        "pulse-gold": "pulse-gold 2s ease-in-out infinite",
+        float: "float 3s ease-in-out infinite",
+        "border-beam": "border-beam 4s linear infinite",
+      },
+      boxShadow: {
+        "xs": "0 1px 2px hsl(0 0% 0% / 0.3)",
+        "sm": "0 2px 4px hsl(0 0% 0% / 0.3)",
+        "md": "0 4px 12px hsl(0 0% 0% / 0.4)",
+        "lg": "0 8px 24px hsl(0 0% 0% / 0.5)",
+        "xl": "0 16px 48px hsl(0 0% 0% / 0.6)",
+        "2xl": "0 24px 64px hsl(0 0% 0% / 0.7)",
+        gold: "0 4px 20px hsl(43 74% 49% / 0.2)",
+        "gold-lg": "0 8px 32px hsl(43 74% 49% / 0.3)",
+        "gold-glow": "0 0 40px hsl(43 74% 49% / 0.25)",
+        card: "0 4px 24px hsl(0 0% 0% / 0.4)",
+        "card-hover": "0 8px 32px hsl(0 0% 0% / 0.5), 0 0 0 1px hsl(43 74% 49% / 0.1)",
+        elevated: "0 16px 64px hsl(0 0% 0% / 0.6)",
+        inner: "inset 0 2px 4px hsl(0 0% 0% / 0.3)",
+        "inner-gold": "inset 0 0 20px hsl(43 74% 49% / 0.1)",
+        "glow-success": "0 0 20px hsl(152 76% 40% / 0.3)",
+        "glow-warning": "0 0 20px hsl(38 92% 50% / 0.3)",
+        "glow-info": "0 0 20px hsl(210 100% 50% / 0.3)",
+        "glow-error": "0 0 20px hsl(0 72% 51% / 0.3)",
+      },
+      backdropBlur: {
+        xs: "2px",
+      },
+      transitionTimingFunction: {
+        "out-expo": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "in-expo": "cubic-bezier(0.7, 0, 0.84, 0)",
+        "bounce-out": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      },
+    },
+  },
+  plugins: [require("tailwindcss-animate")],
+} satisfies Config;
