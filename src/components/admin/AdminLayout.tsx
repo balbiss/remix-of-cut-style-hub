@@ -6,6 +6,7 @@ import { DesktopHeader } from '@/components/admin/DesktopHeader';
 import { BottomNav } from '@/components/admin/BottomNav';
 import { SubscriptionBanner } from '@/components/admin/SubscriptionBanner';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSuperAdmin } from '@/hooks/useSuperAdmin';
 import {
   LayoutDashboard,
   Calendar,
@@ -17,6 +18,7 @@ import {
   Scissors,
   LogOut,
   FileText,
+  Shield,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useResponsive } from '@/hooks/use-responsive';
@@ -53,6 +55,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const navigate = useNavigate();
   const { isDesktop } = useResponsive();
   const { tenant, signOut } = useAuth();
+  const { isSuperAdmin } = useSuperAdmin();
 
   const logoUrl = tenant?.logo_url || null;
   const businessName = tenant?.nome || 'BarberPro';
@@ -119,6 +122,19 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             );
           })}
         </nav>
+
+        {/* Super Admin Link */}
+        {isSuperAdmin && (
+          <div className="px-3 py-2 border-t border-sidebar-border">
+            <NavLink
+              to="/super-admin"
+              className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-orange-400 hover:bg-orange-500/10 transition-all duration-200"
+            >
+              <Shield className="w-4 h-4" />
+              <span>Super Admin</span>
+            </NavLink>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="px-3 py-4 border-t border-sidebar-border">
@@ -189,6 +205,20 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                 );
               })}
             </nav>
+
+            {/* Super Admin Link */}
+            {isSuperAdmin && (
+              <div className="px-3 py-2 border-t border-sidebar-border">
+                <NavLink
+                  to="/super-admin"
+                  onClick={() => setSidebarOpen(false)}
+                  className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-orange-400 hover:bg-orange-500/10 transition-all duration-200"
+                >
+                  <Shield className="w-4 h-4" />
+                  <span>Super Admin</span>
+                </NavLink>
+              </div>
+            )}
 
             {/* Footer */}
             <div className="px-3 py-4 border-t border-sidebar-border pb-20">
