@@ -18,40 +18,52 @@ export type Database = {
         Row: {
           cliente_nome: string
           cliente_zap: string
+          confirmation_code: string | null
           created_at: string | null
           data_hora: string
           id: string
           observacoes: string | null
+          payment_method: string | null
+          prepaid_amount: number | null
           professional_id: string
           service_id: string
           status: string | null
           tenant_id: string
+          tolerance_expires_at: string | null
           updated_at: string | null
         }
         Insert: {
           cliente_nome: string
           cliente_zap: string
+          confirmation_code?: string | null
           created_at?: string | null
           data_hora: string
           id?: string
           observacoes?: string | null
+          payment_method?: string | null
+          prepaid_amount?: number | null
           professional_id: string
           service_id: string
           status?: string | null
           tenant_id: string
+          tolerance_expires_at?: string | null
           updated_at?: string | null
         }
         Update: {
           cliente_nome?: string
           cliente_zap?: string
+          confirmation_code?: string | null
           created_at?: string | null
           data_hora?: string
           id?: string
           observacoes?: string | null
+          payment_method?: string | null
+          prepaid_amount?: number | null
           professional_id?: string
           service_id?: string
           status?: string | null
           tenant_id?: string
+          tolerance_expires_at?: string | null
           updated_at?: string | null
         }
         Relationships: [

@@ -7,8 +7,9 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Scissors, DollarSign, TrendingUp, CheckCircle, Calendar, User, Clock } from 'lucide-react';
+import { Scissors, DollarSign, TrendingUp, CheckCircle, Calendar, User, Clock, Shield } from 'lucide-react';
 import { BarberLayout } from './Layout';
+import { ValidateCodeDialog } from '@/components/barber/ValidateCodeDialog';
 
 interface Appointment {
   id: string;
@@ -17,6 +18,10 @@ interface Appointment {
   data_hora: string;
   status: string;
   observacoes: string | null;
+  confirmation_code: string | null;
+  prepaid_amount: number | null;
+  payment_method: string | null;
+  tolerance_expires_at: string | null;
   service: {
     nome: string;
     preco: number;
@@ -48,6 +53,8 @@ export default function BarberDashboard() {
     monthEarnings: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [validateDialogOpen, setValidateDialogOpen] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
 
   useEffect(() => {
     fetchProfessionalData();
@@ -98,6 +105,10 @@ export default function BarberDashboard() {
         data_hora,
         status,
         observacoes,
+        confirmation_code,
+        prepaid_amount,
+        payment_method,
+        tolerance_expires_at,
         services:service_id (
           nome,
           preco,
@@ -121,6 +132,10 @@ export default function BarberDashboard() {
       data_hora: apt.data_hora,
       status: apt.status,
       observacoes: apt.observacoes,
+      confirmation_code: apt.confirmation_code,
+      prepaid_amount: apt.prepaid_amount,
+      payment_method: apt.payment_method,
+      tolerance_expires_at: apt.tolerance_expires_at,
       service: apt.services,
     }));
 
@@ -204,10 +219,26 @@ export default function BarberDashboard() {
         return <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs">Realizado</Badge>;
       case 'cancelled':
         return <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs">Cancelado</Badge>;
+      case 'confirmed':
+        return <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 text-xs">Confirmado</Badge>;
+      case 'waiting':
+        return <Badge className="bg-orange-500/20 text-orange-400 border-orange-500/30 text-xs">Aguardando</Badge>;
+      case 'no_show':
+        return <Badge className="bg-gray-500/20 text-gray-400 border-gray-500/30 text-xs">Não compareceu</Badge>;
       case 'pending':
       default:
         return <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-xs">Pendente</Badge>;
     }
+  };
+
+  const openValidateDialog = (apt: Appointment) => {
+    setSelectedAppointment(apt);
+    setValidateDialogOpen(true);
+  };
+
+  const handleValidationSuccess = () => {
+    fetchTodayAppointments();
+    fetchStats();
   };
 
   const statsData = [
@@ -338,12 +369,45 @@ export default function BarberDashboard() {
                         Concluir
                       </Button>
                     )}
+                    
+                    {/* Validate Code Button - Only for confirmed online payments */}
+                    {apt.status === 'confirmed' && apt.confirmation_code && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => openValidateDialog(apt)}
+                        className="flex-shrink-0 h-8 px-3 gap-1.5 text-xs border-primary/50 text-primary hover:bg-primary/10"
+                      >
+                        <Shield className="h-3.5 w-3.5" />
+                        Validar
+                      </Button>
+                    )}
+                    
+                    {/* Handle waiting status */}
+                    {apt.status === 'waiting' && (
+                      <Button
+                        size="sm"
+                        onClick={() => markAsCompleted(apt.id)}
+                        className="flex-shrink-0 h-8 px-3 gap-1.5 text-xs"
+                      >
+                        <CheckCircle className="h-3.5 w-3.5" />
+                        Atender
+                      </Button>
+                    )}
                   </div>
                 ))}
               </div>
             )}
           </CardContent>
         </Card>
+
+        {/* Validate Code Dialog */}
+        <ValidateCodeDialog
+          open={validateDialogOpen}
+          onOpenChange={setValidateDialogOpen}
+          appointment={selectedAppointment}
+          onSuccess={handleValidationSuccess}
+        />
       </div>
     </BarberLayout>
   );
