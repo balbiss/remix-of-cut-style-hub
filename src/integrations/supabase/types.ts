@@ -208,6 +208,50 @@ export type Database = {
           },
         ]
       }
+      loyalty_config: {
+        Row: {
+          created_at: string | null
+          enabled: boolean
+          id: string
+          min_amount_for_points: number
+          points_per_real: number
+          points_per_visit: number
+          points_type: string
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          enabled?: boolean
+          id?: string
+          min_amount_for_points?: number
+          points_per_real?: number
+          points_per_visit?: number
+          points_type?: string
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          enabled?: boolean
+          id?: string
+          min_amount_for_points?: number
+          points_per_real?: number
+          points_per_visit?: number
+          points_type?: string
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loyalty_config_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       loyalty_points: {
         Row: {
           cliente_zap: string
@@ -215,6 +259,8 @@ export type Database = {
           id: string
           pontos: number | null
           tenant_id: string
+          total_earned: number
+          total_redeemed: number
           updated_at: string | null
         }
         Insert: {
@@ -223,6 +269,8 @@ export type Database = {
           id?: string
           pontos?: number | null
           tenant_id: string
+          total_earned?: number
+          total_redeemed?: number
           updated_at?: string | null
         }
         Update: {
@@ -231,11 +279,118 @@ export type Database = {
           id?: string
           pontos?: number | null
           tenant_id?: string
+          total_earned?: number
+          total_redeemed?: number
           updated_at?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "loyalty_points_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      loyalty_redemptions: {
+        Row: {
+          client_id: string
+          completed_at: string | null
+          created_at: string | null
+          id: string
+          points_spent: number
+          reward_id: string
+          status: string
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          client_id: string
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          points_spent: number
+          reward_id: string
+          status?: string
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string
+          completed_at?: string | null
+          created_at?: string | null
+          id?: string
+          points_spent?: number
+          reward_id?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loyalty_redemptions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loyalty_redemptions_reward_id_fkey"
+            columns: ["reward_id"]
+            isOneToOne: false
+            referencedRelation: "loyalty_rewards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loyalty_redemptions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      loyalty_rewards: {
+        Row: {
+          active: boolean
+          created_at: string | null
+          descricao: string | null
+          id: string
+          nome: string
+          points_required: number
+          reward_type: string
+          reward_value: number | null
+          tenant_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string | null
+          descricao?: string | null
+          id?: string
+          nome: string
+          points_required?: number
+          reward_type?: string
+          reward_value?: number | null
+          tenant_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean
+          created_at?: string | null
+          descricao?: string | null
+          id?: string
+          nome?: string
+          points_required?: number
+          reward_type?: string
+          reward_value?: number | null
+          tenant_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loyalty_rewards_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
