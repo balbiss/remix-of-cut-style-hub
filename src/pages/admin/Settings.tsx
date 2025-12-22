@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,6 +26,8 @@ import {
   Clock,
   Trophy,
   Loader2,
+  Copy,
+  ExternalLink,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -36,11 +38,22 @@ const AdminSettings = () => {
   
   const [logoPreview, setLogoPreview] = useState<string | null>(tenant?.logo_url || null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [businessName, setBusinessName] = useState(tenant?.nome || '');
+  const [businessSlug, setBusinessSlug] = useState(tenant?.slug || '');
   const [evolutionUrl, setEvolutionUrl] = useState('');
   const [evolutionToken, setEvolutionToken] = useState('');
   const [mpPublicKey, setMpPublicKey] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+
+  // Update local state when tenant changes
+  useEffect(() => {
+    if (tenant) {
+      setLogoPreview(tenant.logo_url || null);
+      setBusinessName(tenant.nome || '');
+      setBusinessSlug(tenant.slug || '');
+    }
+  }, [tenant]);
 
   // Schedule states - using mock-data types
   const [businessHours, setBusinessHours] = useState<BusinessHours[]>(mockBusinessHours);
@@ -105,10 +118,14 @@ const AdminSettings = () => {
         logoUrl = publicUrl;
       }
       
-      // Update tenant record
+      // Update tenant record with logo, name, and slug
       const { error: updateError } = await supabase
         .from('tenants')
-        .update({ logo_url: logoUrl })
+        .update({ 
+          logo_url: logoUrl,
+          nome: businessName,
+          slug: businessSlug,
+        })
         .eq('id', tenant.id);
       
       if (updateError) throw updateError;
@@ -119,13 +136,15 @@ const AdminSettings = () => {
       
       toast({
         title: 'Aparência atualizada!',
-        description: 'A logomarca foi salva com sucesso.',
+        description: 'As configurações foram salvas com sucesso.',
       });
-    } catch (error) {
-      console.error('Error saving logo:', error);
+    } catch (error: any) {
+      console.error('Error saving appearance:', error);
       toast({
         title: 'Erro ao salvar',
-        description: 'Não foi possível salvar a logomarca. Tente novamente.',
+        description: error.message?.includes('slug') 
+          ? 'Este slug já está sendo usado por outra barbearia.' 
+          : 'Não foi possível salvar as configurações. Tente novamente.',
         variant: 'destructive',
       });
     } finally {
@@ -382,7 +401,93 @@ const AdminSettings = () => {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
             >
+              {/* Public Link Card */}
+              <Card variant="elevated">
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <Link2 className="w-6 h-6 text-primary" />
+                    </div>
+                    <div>
+                      <CardTitle>Link Público</CardTitle>
+                      <CardDescription>
+                        Compartilhe este link com seus clientes para agendamentos
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 p-3 bg-secondary rounded-lg font-mono text-sm truncate">
+                      {`${window.location.origin}/b/${businessSlug}`}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/b/${businessSlug}`);
+                        toast({
+                          title: 'Link copiado!',
+                          description: 'O link foi copiado para sua área de transferência.',
+                        });
+                      }}
+                    >
+                      <Copy className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => window.open(`/b/${businessSlug}`, '_blank')}
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Slug (identificador único)
+                    </label>
+                    <Input
+                      type="text"
+                      placeholder="minha-barbearia"
+                      value={businessSlug}
+                      onChange={(e) => setBusinessSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Use apenas letras minúsculas, números e hífens
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Business Name Card */}
+              <Card variant="elevated">
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-gold/10 flex items-center justify-center">
+                      <SettingsIcon className="w-6 h-6 text-gold" />
+                    </div>
+                    <div>
+                      <CardTitle>Nome da Barbearia</CardTitle>
+                      <CardDescription>
+                        O nome será exibido na área pública de agendamento
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Input
+                    type="text"
+                    placeholder="Nome da sua barbearia"
+                    value={businessName}
+                    onChange={(e) => setBusinessName(e.target.value)}
+                  />
+                </CardContent>
+              </Card>
+
+              {/* Logo Card */}
               <Card variant="elevated">
                 <CardHeader>
                   <div className="flex items-center gap-3">
@@ -457,7 +562,7 @@ const AdminSettings = () => {
                   variant="gold"
                   size="lg"
                   onClick={handleSaveAppearance}
-                  disabled={isUploadingLogo || !logoFile}
+                  disabled={isUploadingLogo}
                 >
                   {isUploadingLogo ? (
                     <>

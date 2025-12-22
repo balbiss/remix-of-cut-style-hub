@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 interface Tenant {
   id: string;
   nome: string;
+  slug: string;
   plan: string | null;
   plan_status: string | null;
   plan_activated_at: string | null;
