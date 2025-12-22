@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DynamicLogo } from '@/components/DynamicLogo';
 import { DesktopHeader } from '@/components/admin/DesktopHeader';
@@ -16,6 +16,7 @@ import {
   X,
   ChevronLeft,
   Scissors,
+  LogOut,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useResponsive } from '@/hooks/use-responsive';
@@ -37,11 +38,17 @@ const navItems = [
 export function AdminLayout({ children }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const { isDesktop } = useResponsive();
-  const { tenant } = useAuth();
+  const { tenant, signOut } = useAuth();
 
   const logoUrl = tenant?.logo_url || null;
   const businessName = tenant?.nome || 'BarberPro';
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/auth');
+  };
 
   return (
     <div className="min-h-screen bg-background flex w-full">
@@ -97,7 +104,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         </nav>
 
         {/* Footer */}
-        <div className="p-4 border-t border-sidebar-border">
+        <div className="p-4 border-t border-sidebar-border space-y-2">
           <NavLink
             to="/"
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -105,6 +112,13 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             <ChevronLeft className="w-4 h-4" />
             Voltar ao Site
           </NavLink>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 text-sm text-destructive hover:text-destructive/80 transition-colors w-full"
+          >
+            <LogOut className="w-4 h-4" />
+            Sair
+          </button>
         </div>
       </aside>
 
@@ -167,14 +181,22 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             </nav>
 
             {/* Footer */}
-            <div className="p-4 border-t border-sidebar-border">
+            <div className="p-4 border-t border-sidebar-border space-y-2">
               <NavLink
                 to="/"
+                onClick={() => setSidebarOpen(false)}
                 className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" />
                 Voltar ao Site
               </NavLink>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 text-sm text-destructive hover:text-destructive/80 transition-colors w-full"
+              >
+                <LogOut className="w-4 h-4" />
+                Sair
+              </button>
             </div>
           </motion.aside>
         )}

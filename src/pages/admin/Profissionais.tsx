@@ -7,9 +7,10 @@ import { Badge } from '@/components/ui/badge';
 import { ProfessionalForm } from '@/components/admin/ProfessionalForm';
 import { ProfessionalScheduleForm } from '@/components/admin/ProfessionalScheduleForm';
 import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
-import { mockProfessionals, mockDateBlocks, Professional, ProfessionalSchedule, DateBlock } from '@/lib/mock-data';
+import { useProfessionals, Professional } from '@/hooks/useProfessionals';
+import { useDateBlocks, DateBlock } from '@/hooks/useDateBlocks';
 import { motion } from 'framer-motion';
-import { Users, Plus, Pencil, Trash2, Phone, User, Calendar } from 'lucide-react';
+import { Users, Plus, Pencil, Trash2, Phone, User, Calendar, Loader2 } from 'lucide-react';
 import { useResponsive } from '@/hooks/use-responsive';
 import {
   Table,
@@ -22,8 +23,8 @@ import {
 import { toast } from 'sonner';
 
 const AdminProfissionais = () => {
-  const [professionals, setProfessionals] = useState<Professional[]>(mockProfessionals);
-  const [dateBlocks, setDateBlocks] = useState<DateBlock[]>(mockDateBlocks);
+  const { professionals, loading, addProfessional, updateProfessional, deleteProfessional } = useProfessionals();
+  const { dateBlocks, addDateBlock, deleteDateBlock } = useDateBlocks();
   const [formOpen, setFormOpen] = useState(false);
   const [scheduleFormOpen, setScheduleFormOpen] = useState(false);
   const [editingProfessional, setEditingProfessional] = useState<Professional | null>(null);
@@ -52,58 +53,63 @@ const AdminProfissionais = () => {
     setDeleteDialogOpen(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (deletingId) {
-      setProfessionals(professionals.filter(p => p.id !== deletingId));
-      toast.success('Profissional removido com sucesso');
+      const success = await deleteProfessional(deletingId);
+      if (success) {
+        toast.success('Profissional removido com sucesso');
+      }
     }
     setDeleteDialogOpen(false);
     setDeletingId(null);
   };
 
-  const handleSave = (data: Omit<Professional, 'id' | 'tenant_id'>) => {
+  const handleSave = async (data: Omit<Professional, 'id' | 'tenant_id'>) => {
     if (editingProfessional) {
-      setProfessionals(professionals.map(p => 
-        p.id === editingProfessional.id 
-          ? { ...p, ...data }
-          : p
-      ));
-      toast.success('Profissional atualizado com sucesso');
+      const success = await updateProfessional(editingProfessional.id, data);
+      if (success) {
+        toast.success('Profissional atualizado com sucesso');
+      }
     } else {
-      const newProfessional: Professional = {
-        id: String(Date.now()),
-        tenant_id: '1',
-        ...data,
-      };
-      setProfessionals([...professionals, newProfessional]);
-      toast.success('Profissional adicionado com sucesso');
+      const result = await addProfessional(data);
+      if (result) {
+        toast.success('Profissional adicionado com sucesso');
+      }
     }
   };
 
-  const handleSaveSchedule = (schedule: ProfessionalSchedule) => {
-    if (schedulingProfessional) {
-      setProfessionals(professionals.map(p => 
-        p.id === schedulingProfessional.id 
-          ? { ...p, schedule }
-          : p
-      ));
-      toast.success('Agenda configurada com sucesso');
+  const handleSaveSchedule = async (schedule: Professional['schedule']) => {
+    if (schedulingProfessional && schedule) {
+      const success = await updateProfessional(schedulingProfessional.id, { schedule });
+      if (success) {
+        toast.success('Agenda configurada com sucesso');
+      }
     }
   };
 
-  const handleAddBlock = (block: Omit<DateBlock, 'id'>) => {
-    const newBlock: DateBlock = {
-      ...block,
-      id: String(Date.now()),
-    };
-    setDateBlocks([...dateBlocks, newBlock]);
-    toast.success('Folga adicionada');
+  const handleAddBlock = async (block: Omit<DateBlock, 'id' | 'tenant_id'>) => {
+    const result = await addDateBlock(block);
+    if (result) {
+      toast.success('Folga adicionada');
+    }
   };
 
-  const handleRemoveBlock = (id: string) => {
-    setDateBlocks(dateBlocks.filter(b => b.id !== id));
-    toast.success('Folga removida');
+  const handleRemoveBlock = async (id: string) => {
+    const success = await deleteDateBlock(id);
+    if (success) {
+      toast.success('Folga removida');
+    }
   };
+
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
@@ -126,7 +132,7 @@ const AdminProfissionais = () => {
         </div>
 
         {/* Desktop Table View */}
-        {isDesktop ? (
+        {isDesktop && professionals.length > 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -155,7 +161,7 @@ const AdminProfissionais = () => {
                         </Avatar>
                       </TableCell>
                       <TableCell className="font-medium">{professional.nome}</TableCell>
-                      <TableCell>{professional.telefone}</TableCell>
+                      <TableCell>{professional.telefone || '-'}</TableCell>
                       <TableCell>{professional.especialidade || '-'}</TableCell>
                       <TableCell>
                         <Badge variant={professional.ativo ? 'default' : 'secondary'}>
@@ -196,7 +202,7 @@ const AdminProfissionais = () => {
               </Table>
             </Card>
           </motion.div>
-        ) : (
+        ) : !isDesktop && professionals.length > 0 ? (
           /* Mobile Cards View */
           <div className="space-y-3">
             {professionals.map((professional, index) => (
@@ -229,10 +235,12 @@ const AdminProfissionais = () => {
                             {professional.especialidade}
                           </p>
                         )}
-                        <div className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground mt-1">
-                          <Phone className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
-                          <span className="truncate">{professional.telefone}</span>
-                        </div>
+                        {professional.telefone && (
+                          <div className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground mt-1">
+                            <Phone className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+                            <span className="truncate">{professional.telefone}</span>
+                          </div>
+                        )}
                       </div>
                       <div className="flex flex-col items-center gap-0.5 shrink-0">
                         <Button
@@ -263,7 +271,7 @@ const AdminProfissionais = () => {
               </motion.div>
             ))}
           </div>
-        )}
+        ) : null}
 
         {/* Empty State */}
         {professionals.length === 0 && (
@@ -296,9 +304,24 @@ const AdminProfissionais = () => {
         open={scheduleFormOpen}
         onOpenChange={setScheduleFormOpen}
         professional={schedulingProfessional}
-        dateBlocks={dateBlocks}
+        dateBlocks={dateBlocks.map(b => ({
+          id: b.id,
+          date: b.date,
+          description: b.description,
+          allDay: b.all_day,
+          startTime: b.start_time || undefined,
+          endTime: b.end_time || undefined,
+          professionalId: b.professional_id,
+        }))}
         onSave={handleSaveSchedule}
-        onAddBlock={handleAddBlock}
+        onAddBlock={(block) => handleAddBlock({
+          date: block.date,
+          description: block.description,
+          all_day: block.allDay,
+          start_time: block.startTime || null,
+          end_time: block.endTime || null,
+          professional_id: block.professionalId || null,
+        })}
         onRemoveBlock={handleRemoveBlock}
       />
 

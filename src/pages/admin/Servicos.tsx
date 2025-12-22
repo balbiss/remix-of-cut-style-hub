@@ -5,13 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ServiceForm } from '@/components/admin/ServiceForm';
 import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
-import { mockServices, Service } from '@/lib/mock-data';
+import { useServices, Service } from '@/hooks/useServices';
 import { motion } from 'framer-motion';
-import { Scissors, Plus, Pencil, Trash2, Clock, DollarSign } from 'lucide-react';
+import { Scissors, Plus, Pencil, Trash2, Clock, DollarSign, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const AdminServicos = () => {
-  const [services, setServices] = useState<Service[]>(mockServices);
+  const { services, loading, addService, updateService, deleteService } = useServices();
   const [formOpen, setFormOpen] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -32,33 +32,40 @@ const AdminServicos = () => {
     setDeleteDialogOpen(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (deletingId) {
-      setServices(services.filter(s => s.id !== deletingId));
-      toast.success('Serviço removido com sucesso');
+      const success = await deleteService(deletingId);
+      if (success) {
+        toast.success('Serviço removido com sucesso');
+      }
     }
     setDeleteDialogOpen(false);
     setDeletingId(null);
   };
 
-  const handleSave = (data: Omit<Service, 'id' | 'tenant_id'>) => {
+  const handleSave = async (data: Omit<Service, 'id' | 'tenant_id'>) => {
     if (editingService) {
-      setServices(services.map(s => 
-        s.id === editingService.id 
-          ? { ...s, ...data }
-          : s
-      ));
-      toast.success('Serviço atualizado com sucesso');
+      const success = await updateService(editingService.id, data);
+      if (success) {
+        toast.success('Serviço atualizado com sucesso');
+      }
     } else {
-      const newService: Service = {
-        id: String(Date.now()),
-        tenant_id: '1',
-        ...data,
-      };
-      setServices([...services, newService]);
-      toast.success('Serviço adicionado com sucesso');
+      const result = await addService(data);
+      if (result) {
+        toast.success('Serviço adicionado com sucesso');
+      }
     }
   };
+
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
@@ -81,73 +88,75 @@ const AdminServicos = () => {
         </div>
 
         {/* Services Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-          {services.map((service, index) => (
-            <motion.div
-              key={service.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-            >
-              <Card variant="elevated" className="h-full">
-                <CardContent className="p-4 sm:p-5 flex flex-col h-full">
-                  <div className="flex items-start justify-between mb-2 sm:mb-3 gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-semibold text-base sm:text-lg text-foreground truncate">
-                          {service.nome}
-                        </h3>
-                        <Badge variant={service.ativo ? 'default' : 'secondary'} size="sm">
-                          {service.ativo ? 'Ativo' : 'Inativo'}
-                        </Badge>
+        {services.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+            {services.map((service, index) => (
+              <motion.div
+                key={service.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+              >
+                <Card variant="elevated" className="h-full">
+                  <CardContent className="p-4 sm:p-5 flex flex-col h-full">
+                    <div className="flex items-start justify-between mb-2 sm:mb-3 gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-semibold text-base sm:text-lg text-foreground truncate">
+                            {service.nome}
+                          </h3>
+                          <Badge variant={service.ativo ? 'default' : 'secondary'} size="sm">
+                            {service.ativo ? 'Ativo' : 'Inativo'}
+                          </Badge>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {service.descricao && (
-                    <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4 flex-1 line-clamp-2">
-                      {service.descricao}
-                    </p>
-                  )}
+                    {service.descricao && (
+                      <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4 flex-1 line-clamp-2">
+                        {service.descricao}
+                      </p>
+                    )}
 
-                  <div className="flex items-center justify-between mb-3 sm:mb-4 flex-wrap gap-2">
-                    <div className="flex items-center gap-3 sm:gap-4">
-                      <div className="flex items-center gap-1 sm:gap-1.5 text-primary">
-                        <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                        <span className="font-bold text-base sm:text-lg">
-                          R$ {service.preco.toFixed(2)}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1 sm:gap-1.5 text-muted-foreground">
-                        <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                        <span className="text-xs sm:text-sm">{service.duracao} min</span>
+                    <div className="flex items-center justify-between mb-3 sm:mb-4 flex-wrap gap-2">
+                      <div className="flex items-center gap-3 sm:gap-4">
+                        <div className="flex items-center gap-1 sm:gap-1.5 text-primary">
+                          <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                          <span className="font-bold text-base sm:text-lg">
+                            R$ {service.preco.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 sm:gap-1.5 text-muted-foreground">
+                          <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                          <span className="text-xs sm:text-sm">{service.duracao} min</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-2 pt-3 border-t border-border">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 gap-1.5 sm:gap-2 text-xs sm:text-sm"
-                      onClick={() => handleEdit(service)}
-                    >
-                      <Pencil className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                      Editar
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={() => handleDelete(service.id)}
-                    >
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
+                    <div className="flex items-center gap-2 pt-3 border-t border-border">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 gap-1.5 sm:gap-2 text-xs sm:text-sm"
+                        onClick={() => handleEdit(service)}
+                      >
+                        <Pencil className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                        Editar
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        onClick={() => handleDelete(service.id)}
+                      >
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))}
+          </div>
+        )}
 
         {/* Empty State */}
         {services.length === 0 && (

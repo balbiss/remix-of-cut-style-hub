@@ -8,59 +8,84 @@ import {
   TrendingUp,
   Calendar,
   Clock,
-  ArrowUpRight,
-  ArrowDownRight,
+  Loader2,
 } from 'lucide-react';
-
-const stats = [
-  {
-    title: 'Faturamento Hoje',
-    value: 'R$ 1.250',
-    change: '+12%',
-    icon: DollarSign,
-    trend: 'up',
-  },
-  {
-    title: 'Cortes Realizados',
-    value: '18',
-    change: '+3',
-    icon: Scissors,
-    trend: 'up',
-  },
-  {
-    title: 'Novos Clientes',
-    value: '5',
-    change: 'esta semana',
-    icon: Users,
-    trend: 'neutral',
-  },
-  {
-    title: 'Taxa de Ocupação',
-    value: '87%',
-    change: '+5%',
-    icon: TrendingUp,
-    trend: 'up',
-  },
-];
-
-const upcomingAppointments = [
-  { time: '14:30', client: 'Lucas Mendes', service: 'Corte + Barba', professional: 'Carlos' },
-  { time: '15:00', client: 'Rafael Costa', service: 'Corte Degradê', professional: 'João' },
-  { time: '15:30', client: 'André Souza', service: 'Corte Tradicional', professional: 'Carlos' },
-  { time: '16:00', client: 'Bruno Lima', service: 'Barba Completa', professional: 'Pedro' },
-];
-
-const weeklyData = [
-  { day: 'Seg', value: 85 },
-  { day: 'Ter', value: 70 },
-  { day: 'Qua', value: 92 },
-  { day: 'Qui', value: 78 },
-  { day: 'Sex', value: 95 },
-  { day: 'Sáb', value: 100 },
-  { day: 'Dom', value: 0 },
-];
+import { useAppointments } from '@/hooks/useAppointments';
+import { useServices } from '@/hooks/useServices';
+import { useProfessionals } from '@/hooks/useProfessionals';
+import { format, parseISO } from 'date-fns';
 
 const AdminDashboard = () => {
+  const { appointments, loading: loadingAppointments } = useAppointments({ date: new Date() });
+  const { services, loading: loadingServices } = useServices();
+  const { professionals, loading: loadingProfessionals } = useProfessionals();
+
+  const loading = loadingAppointments || loadingServices || loadingProfessionals;
+
+  // Calculate stats from real data
+  const todayAppointments = appointments.filter(a => a.status !== 'cancelled');
+  const confirmedCount = todayAppointments.filter(a => a.status === 'confirmed').length;
+  const completedCount = todayAppointments.filter(a => a.status === 'completed').length;
+  
+  // Calculate today's revenue from completed appointments
+  const todayRevenue = todayAppointments
+    .filter(a => a.status === 'completed' || a.status === 'confirmed')
+    .reduce((sum, a) => sum + (a.service?.preco || 0), 0);
+
+  const activeProfessionals = professionals.filter(p => p.ativo).length;
+
+  const stats = [
+    {
+      title: 'Faturamento Hoje',
+      value: `R$ ${todayRevenue.toFixed(0)}`,
+      change: todayAppointments.length > 0 ? `${todayAppointments.length} atend.` : 'Sem atendimentos',
+      icon: DollarSign,
+      trend: todayRevenue > 0 ? 'up' : 'neutral',
+    },
+    {
+      title: 'Cortes Realizados',
+      value: String(completedCount),
+      change: `${confirmedCount} confirmados`,
+      icon: Scissors,
+      trend: completedCount > 0 ? 'up' : 'neutral',
+    },
+    {
+      title: 'Profissionais',
+      value: String(activeProfessionals),
+      change: 'ativos',
+      icon: Users,
+      trend: 'neutral',
+    },
+    {
+      title: 'Serviços',
+      value: String(services.filter(s => s.ativo).length),
+      change: 'disponíveis',
+      icon: TrendingUp,
+      trend: 'neutral',
+    },
+  ];
+
+  // Upcoming appointments (confirmed and pending)
+  const upcomingAppointments = todayAppointments
+    .filter(a => a.status === 'confirmed' || a.status === 'pending')
+    .slice(0, 4)
+    .map(a => ({
+      time: format(parseISO(a.data_hora), 'HH:mm'),
+      client: a.cliente_nome,
+      service: a.service?.nome || 'Serviço',
+      professional: a.professional?.nome || 'Profissional',
+    }));
+
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </AdminLayout>
+    );
+  }
+
   return (
     <AdminLayout>
       <div className="space-y-4 sm:space-y-6 overflow-hidden">
@@ -92,13 +117,7 @@ const AdminDashboard = () => {
                       <p className="text-xs sm:text-sm text-muted-foreground truncate">{stat.title}</p>
                       <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">{stat.value}</p>
                       <div className="flex items-center gap-1">
-                        {stat.trend === 'up' && <ArrowUpRight className="w-3 h-3 sm:w-4 sm:h-4 text-success shrink-0" />}
-                        {stat.trend === 'down' && <ArrowDownRight className="w-3 h-3 sm:w-4 sm:h-4 text-destructive shrink-0" />}
-                        <span className={`text-xs sm:text-sm ${
-                          stat.trend === 'up' ? 'text-success' : 
-                          stat.trend === 'down' ? 'text-destructive' : 
-                          'text-muted-foreground'
-                        }`}>
+                        <span className="text-xs sm:text-sm text-muted-foreground">
                           {stat.change}
                         </span>
                       </div>
@@ -130,29 +149,36 @@ const AdminDashboard = () => {
                 </div>
               </CardHeader>
               <CardContent className="px-3 sm:px-6">
-                <div className="space-y-2 sm:space-y-3">
-                  {upcomingAppointments.map((apt, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors"
-                    >
-                      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                        <Clock className="w-3 h-3 text-primary" />
-                        <span className="font-semibold text-foreground text-xs sm:text-sm">{apt.time}</span>
+                {upcomingAppointments.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Calendar className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Nenhum agendamento hoje</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 sm:space-y-3">
+                    {upcomingAppointments.map((apt, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors"
+                      >
+                        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                          <Clock className="w-3 h-3 text-primary" />
+                          <span className="font-semibold text-foreground text-xs sm:text-sm">{apt.time}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-foreground text-xs sm:text-sm truncate">{apt.client}</p>
+                          <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{apt.service}</p>
+                        </div>
+                        <span className="text-[10px] sm:text-xs text-primary hidden sm:block shrink-0">{apt.professional}</span>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-foreground text-xs sm:text-sm truncate">{apt.client}</p>
-                        <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{apt.service}</p>
-                      </div>
-                      <span className="text-[10px] sm:text-xs text-primary hidden sm:block shrink-0">{apt.professional}</span>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </motion.div>
 
-          {/* Weekly Performance Chart */}
+          {/* Services Summary */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -163,33 +189,40 @@ const AdminDashboard = () => {
               <CardHeader className="pb-3 sm:pb-6">
                 <div className="flex items-center gap-2">
                   <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-                  <CardTitle className="text-base sm:text-lg">Ocupação Semanal</CardTitle>
+                  <CardTitle className="text-base sm:text-lg">Serviços Populares</CardTitle>
                 </div>
               </CardHeader>
               <CardContent className="px-3 sm:px-6">
-                <div className="flex items-end justify-between h-32 sm:h-40 gap-1 sm:gap-2">
-                  {weeklyData.map((item, index) => (
-                    <div key={item.day} className="flex-1 flex flex-col items-center gap-1 sm:gap-2">
-                      <motion.div
-                        initial={{ height: 0 }}
-                        animate={{ height: `${item.value}%` }}
-                        transition={{ delay: 0.6 + index * 0.05, duration: 0.5 }}
-                        className={`w-full rounded-t-md ${
-                          item.value > 90 ? 'gold-gradient' : 
-                          item.value > 0 ? 'bg-primary/50' : 
-                          'bg-secondary'
-                        }`}
-                        style={{ minHeight: item.value > 0 ? '8px' : '4px' }}
-                      />
-                      <span className="text-[9px] sm:text-xs text-muted-foreground">{item.day}</span>
-                    </div>
-                  ))}
-                </div>
+                {services.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Scissors className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Nenhum serviço cadastrado</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 sm:space-y-4">
+                    {services.filter(s => s.ativo).slice(0, 4).map((service, index) => (
+                      <div key={service.id} className="space-y-1.5 sm:space-y-2">
+                        <div className="flex justify-between items-center text-xs sm:text-sm">
+                          <span className="text-foreground truncate">{service.nome}</span>
+                          <span className="text-primary font-semibold shrink-0 ml-2">R$ {service.preco.toFixed(0)}</span>
+                        </div>
+                        <div className="h-1.5 sm:h-2 bg-secondary rounded-full overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            animate={{ width: `${100 - index * 20}%` }}
+                            transition={{ delay: 0.7 + index * 0.1, duration: 0.5 }}
+                            className="h-full gold-gradient rounded-full"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </motion.div>
 
-          {/* Performance Summary */}
+          {/* Team Summary */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -199,34 +232,34 @@ const AdminDashboard = () => {
             <Card variant="elevated" className="h-full">
               <CardHeader className="pb-3 sm:pb-6">
                 <div className="flex items-center gap-2">
-                  <Scissors className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-                  <CardTitle className="text-base sm:text-lg">Top Serviços</CardTitle>
+                  <Users className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+                  <CardTitle className="text-base sm:text-lg">Equipe</CardTitle>
                 </div>
               </CardHeader>
               <CardContent className="px-3 sm:px-6">
-                <div className="space-y-3 sm:space-y-4">
-                  {[
-                    { name: 'Corte + Barba', count: 28, percent: 100 },
-                    { name: 'Corte Degradê', count: 22, percent: 78 },
-                    { name: 'Corte Tradicional', count: 18, percent: 64 },
-                    { name: 'Barba Completa', count: 12, percent: 43 },
-                  ].map((service, index) => (
-                    <div key={service.name} className="space-y-1.5 sm:space-y-2">
-                      <div className="flex justify-between items-center text-xs sm:text-sm">
-                        <span className="text-foreground truncate">{service.name}</span>
-                        <span className="text-primary font-semibold shrink-0 ml-2">{service.count}</span>
+                {professionals.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Users className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Nenhum profissional cadastrado</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 sm:space-y-3">
+                    {professionals.filter(p => p.ativo).slice(0, 4).map((prof) => (
+                      <div
+                        key={prof.id}
+                        className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-lg bg-secondary/50"
+                      >
+                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                          <Users className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-foreground text-xs sm:text-sm truncate">{prof.nome}</p>
+                          <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{prof.especialidade || 'Profissional'}</p>
+                        </div>
                       </div>
-                      <div className="h-1.5 sm:h-2 bg-secondary rounded-full overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${service.percent}%` }}
-                          transition={{ delay: 0.7 + index * 0.1, duration: 0.5 }}
-                          className="h-full gold-gradient rounded-full"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </motion.div>
