@@ -5,6 +5,7 @@ interface DynamicLogoProps {
   businessName: string;
   size?: 'sm' | 'md' | 'lg';
   className?: string;
+  showNameWithLogo?: boolean;
 }
 
 const sizeClasses = {
@@ -19,17 +20,26 @@ const textSizeClasses = {
   lg: 'text-3xl',
 };
 
-export function DynamicLogo({ logoUrl, businessName, size = 'md', className = '' }: DynamicLogoProps) {
+export function DynamicLogo({ logoUrl, businessName, size = 'md', className = '', showNameWithLogo = true }: DynamicLogoProps) {
   if (logoUrl) {
     return (
-      <motion.img
+      <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.3 }}
-        src={logoUrl}
-        alt={businessName}
-        className={`${sizeClasses[size]} w-auto object-contain ${className}`}
-      />
+        className={`flex items-center gap-3 ${className}`}
+      >
+        <img
+          src={logoUrl}
+          alt={businessName}
+          className={`${sizeClasses[size]} w-auto object-contain`}
+        />
+        {showNameWithLogo && (
+          <h1 className={`font-display font-bold gold-text ${textSizeClasses[size]}`}>
+            {businessName}
+          </h1>
+        )}
+      </motion.div>
     );
   }
 
