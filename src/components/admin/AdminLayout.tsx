@@ -19,6 +19,16 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useResponsive } from '@/hooks/use-responsive';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -36,6 +46,7 @@ const navItems = [
 
 export function AdminLayout({ children }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { isDesktop } = useResponsive();
@@ -47,6 +58,11 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const handleLogout = async () => {
     await signOut();
     navigate('/auth');
+  };
+
+  const openLogoutDialog = () => {
+    setSidebarOpen(false);
+    setShowLogoutDialog(true);
   };
 
   return (
@@ -105,7 +121,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         {/* Footer */}
         <div className="p-4 border-t border-sidebar-border">
           <button
-            onClick={handleLogout}
+            onClick={openLogoutDialog}
             className="flex items-center gap-3 px-4 py-3 rounded-lg text-destructive hover:bg-destructive/10 transition-all duration-200 w-full"
           >
             <LogOut className="w-5 h-5" />
@@ -173,12 +189,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             </nav>
 
             {/* Footer */}
-            <div className="p-4 border-t border-sidebar-border">
+            <div className="p-4 border-t border-sidebar-border pb-20">
               <button
-                onClick={() => {
-                  setSidebarOpen(false);
-                  handleLogout();
-                }}
+                onClick={openLogoutDialog}
                 className="flex items-center gap-3 px-4 py-3 rounded-lg text-destructive hover:bg-destructive/10 transition-all duration-200 w-full"
               >
                 <LogOut className="w-5 h-5" />
@@ -221,6 +234,27 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
       {/* Mobile Bottom Navigation */}
       <BottomNav />
+
+      {/* Logout Confirmation Dialog */}
+      <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tem certeza que deseja sair?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Você será desconectado da sua conta.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleLogout}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Sair
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
