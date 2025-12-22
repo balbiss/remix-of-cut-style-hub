@@ -7,7 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BusinessHoursForm } from '@/components/admin/BusinessHoursForm';
 import { DateBlockForm } from '@/components/admin/DateBlockForm';
-import { mockTenant, mockBusinessHours, mockBreakTime, mockDateBlocks, BusinessHours, BreakTime, DateBlock } from '@/lib/mock-data';
+import { LoyaltyConfigForm } from '@/components/admin/LoyaltyConfigForm';
+import { LoyaltyRewardsForm } from '@/components/admin/LoyaltyRewardsForm';
+import { useAuth } from '@/contexts/AuthContext';
+import { useDateBlocks } from '@/hooks/useDateBlocks';
 import {
   Settings as SettingsIcon,
   Link2,
@@ -19,21 +22,53 @@ import {
   MessageSquare,
   CreditCard,
   Clock,
+  Trophy,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
+interface BusinessHours {
+  day: number;
+  isOpen: boolean;
+  openTime: string;
+  closeTime: string;
+}
+
+interface BreakTime {
+  enabled: boolean;
+  startTime: string;
+  endTime: string;
+}
+
+const defaultBusinessHours: BusinessHours[] = [
+  { day: 0, isOpen: false, openTime: '09:00', closeTime: '18:00' },
+  { day: 1, isOpen: true, openTime: '09:00', closeTime: '18:00' },
+  { day: 2, isOpen: true, openTime: '09:00', closeTime: '18:00' },
+  { day: 3, isOpen: true, openTime: '09:00', closeTime: '18:00' },
+  { day: 4, isOpen: true, openTime: '09:00', closeTime: '18:00' },
+  { day: 5, isOpen: true, openTime: '09:00', closeTime: '18:00' },
+  { day: 6, isOpen: true, openTime: '09:00', closeTime: '12:00' },
+];
+
+const defaultBreakTime: BreakTime = {
+  enabled: true,
+  startTime: '12:00',
+  endTime: '13:00',
+};
+
 const AdminSettings = () => {
   const { toast } = useToast();
-  const [logoPreview, setLogoPreview] = useState<string | null>(mockTenant.logo_url);
-  const [evolutionUrl, setEvolutionUrl] = useState(mockTenant.evolution_api_url || '');
-  const [evolutionToken, setEvolutionToken] = useState(mockTenant.evolution_api_token || '');
-  const [mpPublicKey, setMpPublicKey] = useState(mockTenant.mp_public_key || '');
+  const { tenant } = useAuth();
+  const { dateBlocks, addDateBlock, deleteDateBlock } = useDateBlocks();
+  
+  const [logoPreview, setLogoPreview] = useState<string | null>(tenant?.logo_url || null);
+  const [evolutionUrl, setEvolutionUrl] = useState(tenant?.evolution_api_url || '');
+  const [evolutionToken, setEvolutionToken] = useState(tenant?.evolution_api_token || '');
+  const [mpPublicKey, setMpPublicKey] = useState(tenant?.mp_public_key || '');
   const [isSaving, setIsSaving] = useState(false);
 
   // Schedule states
-  const [businessHours, setBusinessHours] = useState<BusinessHours[]>(mockBusinessHours);
-  const [breakTime, setBreakTime] = useState<BreakTime>(mockBreakTime);
-  const [dateBlocks, setDateBlocks] = useState<DateBlock[]>(mockDateBlocks);
+  const [businessHours, setBusinessHours] = useState<BusinessHours[]>(defaultBusinessHours);
+  const [breakTime, setBreakTime] = useState<BreakTime>(defaultBreakTime);
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -48,7 +83,6 @@ const AdminSettings = () => {
 
   const handleSaveIntegrations = async () => {
     setIsSaving(true);
-    // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 1000));
     setIsSaving(false);
     toast({
@@ -59,7 +93,6 @@ const AdminSettings = () => {
 
   const handleSaveAppearance = async () => {
     setIsSaving(true);
-    // Simulate API call
     await new Promise((resolve) => setTimeout(resolve, 1000));
     setIsSaving(false);
     toast({
@@ -78,23 +111,12 @@ const AdminSettings = () => {
     });
   };
 
-  const handleAddDateBlock = (block: Omit<DateBlock, 'id'>) => {
-    const newBlock: DateBlock = {
-      ...block,
-      id: String(Date.now()),
-    };
-    setDateBlocks([...dateBlocks, newBlock]);
-    toast({
-      title: 'Bloqueio adicionado!',
-      description: `Data ${block.date} bloqueada com sucesso.`,
-    });
+  const handleAddDateBlock = async (block: { date: string; description: string; all_day: boolean; start_time?: string; end_time?: string }) => {
+    await addDateBlock(block);
   };
 
-  const handleRemoveDateBlock = (id: string) => {
-    setDateBlocks(dateBlocks.filter(b => b.id !== id));
-    toast({
-      title: 'Bloqueio removido!',
-    });
+  const handleRemoveDateBlock = async (id: string) => {
+    await deleteDateBlock(id);
   };
 
   return (
@@ -119,6 +141,13 @@ const AdminSettings = () => {
             >
               <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1 sm:mr-2 shrink-0" />
               <span className="truncate">Horários</span>
+            </TabsTrigger>
+            <TabsTrigger
+              value="loyalty"
+              className="flex-1 min-w-0 text-xs sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
+              <Trophy className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1 sm:mr-2 shrink-0" />
+              <span className="truncate">Fidelidade</span>
             </TabsTrigger>
             <TabsTrigger
               value="integrations"
@@ -151,7 +180,14 @@ const AdminSettings = () => {
               />
 
               <DateBlockForm
-                dateBlocks={dateBlocks}
+                dateBlocks={dateBlocks.map(b => ({
+                  id: b.id,
+                  date: b.date,
+                  description: b.description,
+                  all_day: b.all_day ?? true,
+                  start_time: b.start_time ?? undefined,
+                  end_time: b.end_time ?? undefined,
+                }))}
                 onAddBlock={handleAddDateBlock}
                 onRemoveBlock={handleRemoveDateBlock}
               />
@@ -178,6 +214,18 @@ const AdminSettings = () => {
                   )}
                 </Button>
               </div>
+            </motion.div>
+          </TabsContent>
+
+          {/* Loyalty Tab */}
+          <TabsContent value="loyalty" className="space-y-6">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
+            >
+              <LoyaltyConfigForm />
+              <LoyaltyRewardsForm />
             </motion.div>
           </TabsContent>
 

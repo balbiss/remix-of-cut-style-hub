@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DynamicLogo } from '@/components/DynamicLogo';
 import { StepIndicator } from '@/components/booking/StepIndicator';
@@ -9,8 +9,8 @@ import { ClientInfoForm } from '@/components/booking/ClientInfoForm';
 import { PaymentStep } from '@/components/booking/PaymentStep';
 import { SuccessScreen } from '@/components/booking/SuccessScreen';
 import { Button } from '@/components/ui/button';
-import { mockTenant, mockProfessionals, mockServices } from '@/lib/mock-data';
-import { ChevronLeft, Sparkles } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { ChevronLeft, Sparkles, Loader2 } from 'lucide-react';
 
 const stepLabels = [
   'Profissional',
@@ -20,10 +20,49 @@ const stepLabels = [
   'Pagamento',
 ];
 
+// Default tenant ID - in production this would come from subdomain or route
+const DEFAULT_TENANT_ID = 'demo';
+
+interface Professional {
+  id: string;
+  nome: string;
+  especialidade: string | null;
+  avatar_url: string | null;
+}
+
+interface Service {
+  id: string;
+  nome: string;
+  preco: number;
+  duracao: number;
+  descricao: string | null;
+}
+
+interface Tenant {
+  id: string;
+  nome: string;
+  logo_url: string | null;
+}
+
+interface LoyaltyConfig {
+  enabled: boolean;
+  points_type: 'visit' | 'amount';
+  points_per_visit: number;
+  points_per_real: number;
+  min_amount_for_points: number;
+}
+
 const Index = () => {
   const [showWizard, setShowWizard] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Data from Supabase
+  const [tenant, setTenant] = useState<Tenant | null>(null);
+  const [professionals, setProfessionals] = useState<Professional[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [loyaltyConfig, setLoyaltyConfig] = useState<LoyaltyConfig | null>(null);
 
   // Booking state
   const [selectedProfessional, setSelectedProfessional] = useState<string | null>(null);
@@ -33,8 +72,65 @@ const Index = () => {
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
 
+  // Points earned after booking
+  const [earnedPoints, setEarnedPoints] = useState(0);
+  const [totalPoints, setTotalPoints] = useState(0);
+
+  // Fetch initial data
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch first active tenant (in production, this would be based on subdomain)
+        const { data: tenantData } = await supabase
+          .from('tenants')
+          .select('*')
+          .limit(1)
+          .single();
+
+        if (tenantData) {
+          setTenant(tenantData);
+
+          // Fetch professionals
+          const { data: prosData } = await supabase
+            .from('professionals')
+            .select('id, nome, especialidade, avatar_url')
+            .eq('tenant_id', tenantData.id)
+            .eq('ativo', true);
+
+          setProfessionals(prosData || []);
+
+          // Fetch services
+          const { data: servicesData } = await supabase
+            .from('services')
+            .select('id, nome, preco, duracao, descricao')
+            .eq('tenant_id', tenantData.id)
+            .eq('ativo', true);
+
+          setServices(servicesData || []);
+
+          // Fetch loyalty config
+          const { data: loyaltyData } = await supabase
+            .from('loyalty_config')
+            .select('*')
+            .eq('tenant_id', tenantData.id)
+            .maybeSingle();
+
+          if (loyaltyData) {
+            setLoyaltyConfig(loyaltyData as LoyaltyConfig);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
   const totalPrice = selectedServices.reduce((sum, id) => {
-    const service = mockServices.find((s) => s.id === id);
+    const service = services.find((s) => s.id === id);
     return sum + (service?.preco || 0);
   }, 0);
 
@@ -80,13 +176,120 @@ const Index = () => {
     );
   };
 
-  const handlePayment = (method: 'online' | 'local') => {
-    // Simulate payment processing
-    setIsSuccess(true);
+  const calculatePoints = () => {
+    if (!loyaltyConfig || !loyaltyConfig.enabled) return 0;
+
+    if (loyaltyConfig.points_type === 'visit') {
+      return loyaltyConfig.points_per_visit;
+    } else {
+      if (totalPrice >= loyaltyConfig.min_amount_for_points) {
+        return Math.floor(totalPrice * loyaltyConfig.points_per_real);
+      }
+      return 0;
+    }
   };
 
+  const handlePayment = async (method: 'online' | 'local') => {
+    if (!tenant || !selectedProfessional || !selectedDate || !selectedTime) return;
+
+    try {
+      // Create appointment
+      const appointmentDateTime = new Date(selectedDate);
+      const [hours, minutes] = selectedTime.split(':');
+      appointmentDateTime.setHours(parseInt(hours), parseInt(minutes));
+
+      const { error: appointmentError } = await supabase
+        .from('appointments')
+        .insert({
+          tenant_id: tenant.id,
+          professional_id: selectedProfessional,
+          service_id: selectedServices[0], // Primary service
+          cliente_nome: clientName,
+          cliente_zap: clientPhone,
+          data_hora: appointmentDateTime.toISOString(),
+          status: 'confirmed',
+        });
+
+      if (appointmentError) throw appointmentError;
+
+      // Calculate and add loyalty points
+      const pointsToAdd = calculatePoints();
+      setEarnedPoints(pointsToAdd);
+
+      if (pointsToAdd > 0) {
+        // Check if client already has points
+        const { data: existingPoints } = await supabase
+          .from('loyalty_points')
+          .select('*')
+          .eq('tenant_id', tenant.id)
+          .eq('cliente_zap', clientPhone)
+          .maybeSingle();
+
+        if (existingPoints) {
+          const newTotal = (existingPoints.pontos || 0) + pointsToAdd;
+          setTotalPoints(newTotal);
+
+          await supabase
+            .from('loyalty_points')
+            .update({
+              pontos: newTotal,
+              total_earned: ((existingPoints as any).total_earned || 0) + pointsToAdd,
+            })
+            .eq('id', existingPoints.id);
+        } else {
+          setTotalPoints(pointsToAdd);
+
+          await supabase
+            .from('loyalty_points')
+            .insert({
+              tenant_id: tenant.id,
+              cliente_zap: clientPhone,
+              pontos: pointsToAdd,
+              total_earned: pointsToAdd,
+              total_redeemed: 0,
+            });
+        }
+
+        // Also ensure client exists in clients table
+        const { data: existingClient } = await supabase
+          .from('clients')
+          .select('id')
+          .eq('tenant_id', tenant.id)
+          .eq('telefone', clientPhone)
+          .maybeSingle();
+
+        if (!existingClient) {
+          await supabase.from('clients').insert({
+            tenant_id: tenant.id,
+            nome: clientName,
+            telefone: clientPhone,
+          });
+        }
+      }
+
+      setIsSuccess(true);
+    } catch (error) {
+      console.error('Error creating appointment:', error);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-gold" />
+      </div>
+    );
+  }
+
   if (isSuccess) {
-    return <SuccessScreen clientName={clientName} loyaltyPoints={150} />;
+    return (
+      <SuccessScreen
+        clientName={clientName}
+        loyaltyPoints={totalPoints}
+        earnedPoints={earnedPoints}
+        loyaltyEnabled={loyaltyConfig?.enabled || false}
+      />
+    );
   }
 
   return (
@@ -105,8 +308,8 @@ const Index = () => {
             <div className="w-10" /> 
           )}
           <DynamicLogo
-            logoUrl={mockTenant.logo_url}
-            businessName={mockTenant.nome}
+            logoUrl={tenant?.logo_url || null}
+            businessName={tenant?.nome || 'Barbearia'}
             size="md"
           />
           {!showWizard ? (
@@ -150,10 +353,16 @@ const Index = () => {
                 size="xl"
                 onClick={() => setShowWizard(true)}
                 className="w-full max-w-xs animate-glow"
+                disabled={professionals.length === 0 || services.length === 0}
               >
                 <Sparkles className="w-5 h-5 mr-2" />
                 Agendar Agora
               </Button>
+              {(professionals.length === 0 || services.length === 0) && (
+                <p className="text-sm text-muted-foreground mt-4">
+                  Em breve disponível para agendamentos
+                </p>
+              )}
             </motion.div>
 
             {/* Features */}
@@ -200,7 +409,7 @@ const Index = () => {
                     exit={{ opacity: 0, x: -20 }}
                   >
                     <ProfessionalSelect
-                      professionals={mockProfessionals}
+                      professionals={professionals}
                       selectedId={selectedProfessional}
                       onSelect={setSelectedProfessional}
                     />
@@ -215,7 +424,7 @@ const Index = () => {
                     exit={{ opacity: 0, x: -20 }}
                   >
                     <ServiceSelect
-                      services={mockServices}
+                      services={services}
                       selectedIds={selectedServices}
                       onToggle={handleServiceToggle}
                     />
@@ -262,8 +471,8 @@ const Index = () => {
                     exit={{ opacity: 0, x: -20 }}
                   >
                     <PaymentStep
-                      professional={mockProfessionals.find((p) => p.id === selectedProfessional)}
-                      services={mockServices.filter((s) => selectedServices.includes(s.id))}
+                      professional={professionals.find((p) => p.id === selectedProfessional)}
+                      services={services.filter((s) => selectedServices.includes(s.id))}
                       date={selectedDate}
                       time={selectedTime}
                       clientName={clientName}
