@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar, Clock, ChevronLeft, ChevronRight, Filter, Plus, Check, X, MoreVertical } from 'lucide-react';
+import { Calendar, Clock, ChevronLeft, ChevronRight, Filter, Plus, Check, X, MoreVertical, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { useResponsive } from '@/hooks/use-responsive';
 import { AppointmentForm } from '@/components/admin/AppointmentForm';
 import { ConfirmDialog } from '@/components/admin/ConfirmDialog';
+import { useAppointments } from '@/hooks/useAppointments';
+import { format, parseISO } from 'date-fns';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,30 +23,11 @@ const timeSlots = [
   '17:00', '17:30', '18:00', '18:30', '19:00', '19:30',
 ];
 
-interface Appointment {
-  id: string;
-  time: string;
-  client: string;
-  service: string;
-  duration: number;
-  status: 'confirmed' | 'pending' | 'cancelled';
-  professional: string;
-  clientZap?: string;
-}
-
-const initialAppointments: Appointment[] = [
-  { id: '1', time: '09:00', client: 'Lucas Mendes', service: 'Corte + Barba', duration: 45, status: 'confirmed', professional: 'Carlos', clientZap: '11999998888' },
-  { id: '2', time: '10:00', client: 'Rafael Costa', service: 'Corte Degradê', duration: 40, status: 'confirmed', professional: 'João', clientZap: '11999997777' },
-  { id: '3', time: '11:00', client: 'André Souza', service: 'Corte Tradicional', duration: 30, status: 'pending', professional: 'Carlos', clientZap: '11999996666' },
-  { id: '4', time: '14:30', client: 'Bruno Lima', service: 'Barba Completa', duration: 25, status: 'confirmed', professional: 'Pedro', clientZap: '11999995555' },
-  { id: '5', time: '16:00', client: 'Carlos Silva', service: 'Corte + Barba', duration: 45, status: 'confirmed', professional: 'João', clientZap: '11999994444' },
-];
-
 const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 const AdminAgenda = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments);
+  const { appointments, loading, addAppointment, updateAppointmentStatus, refetch } = useAppointments({ date: selectedDate });
   const [formOpen, setFormOpen] = useState(false);
   const [selectedTime, setSelectedTime] = useState<string | undefined>();
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
@@ -58,8 +41,19 @@ const AdminAgenda = () => {
     year: 'numeric',
   });
 
+  const appointmentsByTime = useMemo(() => {
+    const map: Record<string, typeof appointments[0]> = {};
+    appointments.forEach((apt) => {
+      if (apt.status !== 'cancelled') {
+        const time = format(parseISO(apt.data_hora), 'HH:mm');
+        map[time] = apt;
+      }
+    });
+    return map;
+  }, [appointments]);
+
   const getAppointmentForTime = (time: string) => {
-    return appointments.find((apt) => apt.time === time && apt.status !== 'cancelled');
+    return appointmentsByTime[time];
   };
 
   const getWeekDates = () => {
@@ -83,11 +77,11 @@ const AdminAgenda = () => {
     setFormOpen(true);
   };
 
-  const handleConfirm = (id: string) => {
-    setAppointments(appointments.map(apt => 
-      apt.id === id ? { ...apt, status: 'confirmed' } : apt
-    ));
-    toast.success('Agendamento confirmado!');
+  const handleConfirm = async (id: string) => {
+    const success = await updateAppointmentStatus(id, 'confirmed');
+    if (success) {
+      toast.success('Agendamento confirmado!');
+    }
   };
 
   const handleCancel = (id: string) => {
@@ -95,18 +89,18 @@ const AdminAgenda = () => {
     setCancelDialogOpen(true);
   };
 
-  const confirmCancel = () => {
+  const confirmCancel = async () => {
     if (cancellingId) {
-      setAppointments(appointments.map(apt => 
-        apt.id === cancellingId ? { ...apt, status: 'cancelled' } : apt
-      ));
-      toast.success('Agendamento cancelado');
+      const success = await updateAppointmentStatus(cancellingId, 'cancelled');
+      if (success) {
+        toast.success('Agendamento cancelado');
+      }
     }
     setCancelDialogOpen(false);
     setCancellingId(null);
   };
 
-  const handleSaveAppointment = (data: {
+  const handleSaveAppointment = async (data: {
     professional_id: string;
     service_id: string;
     data_hora: string;
@@ -115,24 +109,25 @@ const AdminAgenda = () => {
     observacoes?: string;
     status: 'pending' | 'confirmed';
   }) => {
-    const time = data.data_hora.split('T')[1]?.substring(0, 5) || '09:00';
-    const newAppointment: Appointment = {
-      id: String(Date.now()),
-      time,
-      client: data.cliente_nome,
-      service: 'Serviço',
-      duration: 30,
-      status: data.status,
-      professional: 'Profissional',
-      clientZap: data.cliente_zap,
-    };
-    setAppointments([...appointments, newAppointment]);
-    toast.success('Agendamento criado com sucesso!');
+    const result = await addAppointment(data);
+    if (result) {
+      toast.success('Agendamento criado com sucesso!');
+    }
   };
 
+  const activeAppointments = appointments.filter(a => a.status !== 'cancelled');
   const confirmedCount = appointments.filter(a => a.status === 'confirmed').length;
-  const pendingCount = appointments.filter(a => a.status === 'pending').length;
-  const availableCount = timeSlots.length - appointments.filter(a => a.status !== 'cancelled').length;
+  const availableCount = timeSlots.length - activeAppointments.length;
+
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
@@ -148,13 +143,21 @@ const AdminAgenda = () => {
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1">
-              <Button variant="outline" size="icon-sm">
+              <Button variant="outline" size="icon-sm" onClick={() => {
+                const newDate = new Date(selectedDate);
+                newDate.setDate(newDate.getDate() - 7);
+                setSelectedDate(newDate);
+              }}>
                 <ChevronLeft className="w-4 h-4" />
               </Button>
-              <Button variant="outline" size="sm" className="min-w-[80px] text-xs sm:text-sm">
+              <Button variant="outline" size="sm" className="min-w-[80px] text-xs sm:text-sm" onClick={() => setSelectedDate(new Date())}>
                 Hoje
               </Button>
-              <Button variant="outline" size="icon-sm">
+              <Button variant="outline" size="icon-sm" onClick={() => {
+                const newDate = new Date(selectedDate);
+                newDate.setDate(newDate.getDate() + 7);
+                setSelectedDate(newDate);
+              }}>
                 <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
@@ -198,7 +201,6 @@ const AdminAgenda = () => {
                   {weekDates.map((date, index) => {
                     const isToday = date.toDateString() === new Date().toDateString();
                     const isSelected = date.toDateString() === selectedDate.toDateString();
-                    const hasAppointments = index % 2 === 0;
                     
                     return (
                       <button
@@ -216,9 +218,6 @@ const AdminAgenda = () => {
                         <span className={`text-sm sm:text-lg lg:text-xl font-bold ${isSelected ? '' : 'text-foreground'}`}>
                           {date.getDate()}
                         </span>
-                        {hasAppointments && !isSelected && (
-                          <span className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-primary mt-0.5 sm:mt-1" />
-                        )}
                       </button>
                     );
                   })}
@@ -227,7 +226,7 @@ const AdminAgenda = () => {
                 {/* Stats */}
                 <div className="grid grid-cols-3 gap-2 sm:gap-4 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-border">
                   <div className="text-center">
-                    <p className="text-lg sm:text-2xl font-bold text-primary">{confirmedCount + pendingCount}</p>
+                    <p className="text-lg sm:text-2xl font-bold text-primary">{activeAppointments.length}</p>
                     <p className="text-[10px] sm:text-xs text-muted-foreground">Agendados</p>
                   </div>
                   <div className="text-center">
@@ -286,14 +285,14 @@ const AdminAgenda = () => {
                         {appointment ? (
                           <div className="flex-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 min-w-0">
                             <div className="flex-1 min-w-0">
-                              <p className="font-medium text-foreground text-sm sm:text-base truncate">{appointment.client}</p>
+                              <p className="font-medium text-foreground text-sm sm:text-base truncate">{appointment.cliente_nome}</p>
                               <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                                {appointment.service} • {appointment.duration} min
+                                {appointment.service?.nome || 'Serviço'} • {appointment.service?.duracao || 30} min
                               </p>
                             </div>
                             <div className="flex items-center gap-1.5 sm:gap-2">
                               <span className="hidden lg:block text-xs sm:text-sm text-primary">
-                                {appointment.professional}
+                                {appointment.professional?.nome || 'Profissional'}
                               </span>
                               <span className={`px-2 py-0.5 sm:px-3 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium ${
                                 appointment.status === 'confirmed'
