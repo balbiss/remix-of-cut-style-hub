@@ -1,6 +1,13 @@
 import { motion } from 'framer-motion';
-import { Service } from '@/lib/mock-data';
 import { Clock, Check } from 'lucide-react';
+
+interface Service {
+  id: string;
+  nome: string;
+  preco: number;
+  duracao: number;
+  descricao?: string | null;
+}
 
 interface ServiceSelectProps {
   services: Service[];

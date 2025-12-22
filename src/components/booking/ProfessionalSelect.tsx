@@ -1,6 +1,12 @@
 import { motion } from 'framer-motion';
-import { Professional } from '@/lib/mock-data';
 import { User } from 'lucide-react';
+
+interface Professional {
+  id: string;
+  nome: string;
+  especialidade?: string | null;
+  avatar_url?: string | null;
+}
 
 interface ProfessionalSelectProps {
   professionals: Professional[];
