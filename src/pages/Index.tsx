@@ -20,8 +20,6 @@ const stepLabels = [
   'Pagamento',
 ];
 
-// Default tenant ID - in production this would come from subdomain or route
-const DEFAULT_TENANT_ID = 'demo';
 
 interface Professional {
   id: string;
@@ -80,12 +78,29 @@ const Index = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch first active tenant (in production, this would be based on subdomain)
-        const { data: tenantData } = await supabase
-          .from('tenants')
-          .select('*')
-          .limit(1)
-          .single();
+        // Get tenant_id from URL query string or fetch first tenant
+        const urlParams = new URLSearchParams(window.location.search);
+        const tenantIdFromUrl = urlParams.get('tenant');
+        
+        let tenantData;
+        
+        if (tenantIdFromUrl) {
+          // Fetch specific tenant by ID
+          const { data } = await supabase
+            .from('tenants')
+            .select('*')
+            .eq('id', tenantIdFromUrl)
+            .single();
+          tenantData = data;
+        } else {
+          // Fetch first active tenant (fallback for development)
+          const { data } = await supabase
+            .from('tenants')
+            .select('*')
+            .limit(1)
+            .single();
+          tenantData = data;
+        }
 
         if (tenantData) {
           setTenant(tenantData);

@@ -11,6 +11,7 @@ import { LoyaltyConfigForm } from '@/components/admin/LoyaltyConfigForm';
 import { LoyaltyRewardsForm } from '@/components/admin/LoyaltyRewardsForm';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDateBlocks } from '@/hooks/useDateBlocks';
+import { supabase } from '@/integrations/supabase/client';
 import { mockBusinessHours, mockBreakTime, BusinessHours, BreakTime, DateBlock } from '@/lib/mock-data';
 import {
   Settings as SettingsIcon,
@@ -24,19 +25,22 @@ import {
   CreditCard,
   Clock,
   Trophy,
+  Loader2,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 const AdminSettings = () => {
   const { toast } = useToast();
-  const { tenant } = useAuth();
+  const { tenant, refreshTenant } = useAuth();
   const { dateBlocks, addDateBlock, deleteDateBlock } = useDateBlocks();
   
   const [logoPreview, setLogoPreview] = useState<string | null>(tenant?.logo_url || null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
   const [evolutionUrl, setEvolutionUrl] = useState('');
   const [evolutionToken, setEvolutionToken] = useState('');
   const [mpPublicKey, setMpPublicKey] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
 
   // Schedule states - using mock-data types
   const [businessHours, setBusinessHours] = useState<BusinessHours[]>(mockBusinessHours);
@@ -45,6 +49,17 @@ const AdminSettings = () => {
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Validate file size (max 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        toast({
+          title: 'Arquivo muito grande',
+          description: 'O tamanho máximo permitido é 2MB.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      setLogoFile(file);
       const reader = new FileReader();
       reader.onload = (event) => {
         setLogoPreview(event.target?.result as string);
@@ -64,13 +79,58 @@ const AdminSettings = () => {
   };
 
   const handleSaveAppearance = async () => {
-    setIsSaving(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setIsSaving(false);
-    toast({
-      title: 'Aparência atualizada!',
-      description: 'A logomarca foi salva com sucesso.',
-    });
+    if (!tenant) return;
+    
+    setIsUploadingLogo(true);
+    try {
+      let logoUrl = tenant.logo_url;
+      
+      // Upload new logo if file was selected
+      if (logoFile) {
+        const fileExt = logoFile.name.split('.').pop();
+        const fileName = `${tenant.id}.${fileExt}`;
+        
+        // Upload to Supabase Storage
+        const { error: uploadError } = await supabase.storage
+          .from('logos')
+          .upload(fileName, logoFile, { upsert: true });
+        
+        if (uploadError) throw uploadError;
+        
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('logos')
+          .getPublicUrl(fileName);
+        
+        logoUrl = publicUrl;
+      }
+      
+      // Update tenant record
+      const { error: updateError } = await supabase
+        .from('tenants')
+        .update({ logo_url: logoUrl })
+        .eq('id', tenant.id);
+      
+      if (updateError) throw updateError;
+      
+      // Refresh tenant data in context
+      await refreshTenant();
+      setLogoFile(null);
+      
+      toast({
+        title: 'Aparência atualizada!',
+        description: 'A logomarca foi salva com sucesso.',
+      });
+    } catch (error) {
+      console.error('Error saving logo:', error);
+      toast({
+        title: 'Erro ao salvar',
+        description: 'Não foi possível salvar a logomarca. Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploadingLogo(false);
+    }
   };
 
   const handleSaveSchedule = async () => {
@@ -397,15 +457,13 @@ const AdminSettings = () => {
                   variant="gold"
                   size="lg"
                   onClick={handleSaveAppearance}
-                  disabled={isSaving}
+                  disabled={isUploadingLogo || !logoFile}
                 >
-                  {isSaving ? (
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                    >
-                      <Save className="w-5 h-5" />
-                    </motion.div>
+                  {isUploadingLogo ? (
+                    <>
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      Salvando...
+                    </>
                   ) : (
                     <>
                       <Check className="w-5 h-5 mr-2" />
