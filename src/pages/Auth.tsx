@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Scissors, Mail, Lock, User, Building2, ArrowLeft } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { LoadingSpinner, GoogleLoadingSpinner } from '@/components/auth/LoadingSpinner';
+import { supabase } from '@/integrations/supabase/client';
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -39,6 +40,34 @@ type ForgotFormData = z.infer<typeof forgotSchema>;
 
 type AuthMode = 'login' | 'signup' | 'forgot';
 
+// Helper function to check user role and redirect accordingly
+const checkRoleAndRedirect = async (userId: string, navigate: ReturnType<typeof useNavigate>) => {
+  try {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('role', 'barber')
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error checking user role:', error);
+      navigate('/admin');
+      return;
+    }
+
+    // If user has barber role, redirect to barber area
+    if (data) {
+      navigate('/barbeiro');
+    } else {
+      navigate('/admin');
+    }
+  } catch (error) {
+    console.error('Error checking user role:', error);
+    navigate('/admin');
+  }
+};
+
 export default function Auth() {
   const [mode, setMode] = useState<AuthMode>('login');
   const [isLoading, setIsLoading] = useState(false);
@@ -62,13 +91,13 @@ export default function Auth() {
 
   useEffect(() => {
     if (user) {
-      navigate('/admin');
+      checkRoleAndRedirect(user.id, navigate);
     }
   }, [user, navigate]);
 
   const handleLogin = async (data: LoginFormData) => {
     setIsLoading(true);
-    const { error } = await signIn(data.email, data.password);
+    const { error, data: authData } = await signIn(data.email, data.password);
     setIsLoading(false);
 
     if (error) {
@@ -90,7 +119,11 @@ export default function Auth() {
       title: 'Bem-vindo!',
       description: 'Login realizado com sucesso',
     });
-    navigate('/admin');
+    
+    // Redirect based on user role
+    if (authData?.user) {
+      await checkRoleAndRedirect(authData.user.id, navigate);
+    }
   };
 
   const handleSignup = async (data: SignupFormData) => {
