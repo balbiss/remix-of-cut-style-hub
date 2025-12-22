@@ -81,6 +81,11 @@ interface DateBlock {
   professional_id: string | null;
 }
 
+interface AppointmentForCalendar {
+  data_hora: string;
+  service_duration: number;
+}
+
 const Index = () => {
   const [showWizard, setShowWizard] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
@@ -94,6 +99,7 @@ const Index = () => {
   const [loyaltyConfig, setLoyaltyConfig] = useState<LoyaltyConfig | null>(null);
   const [businessHours, setBusinessHours] = useState<BusinessHour[]>([]);
   const [dateBlocks, setDateBlocks] = useState<DateBlock[]>([]);
+  const [professionalAppointments, setProfessionalAppointments] = useState<AppointmentForCalendar[]>([]);
 
   // Booking state
   const [selectedProfessional, setSelectedProfessional] = useState<string | null>(null);
@@ -206,6 +212,41 @@ const Index = () => {
 
     fetchData();
   }, []);
+
+  // Fetch appointments when professional is selected
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      if (!tenant?.id || !selectedProfessional) {
+        setProfessionalAppointments([]);
+        return;
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const { data: appointmentsData } = await supabase
+        .from('appointments')
+        .select('data_hora, service_id')
+        .eq('tenant_id', tenant.id)
+        .eq('professional_id', selectedProfessional)
+        .gte('data_hora', today.toISOString())
+        .in('status', ['pending', 'confirmed']);
+
+      if (appointmentsData) {
+        // Map appointments with service duration
+        const mappedAppointments = appointmentsData.map(apt => {
+          const service = services.find(s => s.id === apt.service_id);
+          return {
+            data_hora: apt.data_hora,
+            service_duration: service?.duracao || 30
+          };
+        });
+        setProfessionalAppointments(mappedAppointments);
+      }
+    };
+
+    fetchAppointments();
+  }, [tenant?.id, selectedProfessional, services]);
 
   const totalPrice = selectedServices.reduce((sum, id) => {
     const service = services.find((s) => s.id === id);
@@ -525,6 +566,11 @@ const Index = () => {
                       businessHours={businessHours}
                       dateBlocks={dateBlocks}
                       professionalId={selectedProfessional}
+                      appointments={professionalAppointments}
+                      serviceDuration={selectedServices.reduce((sum, id) => {
+                        const service = services.find(s => s.id === id);
+                        return sum + (service?.duracao || 30);
+                      }, 0) || 30}
                     />
                   </motion.div>
                 )}
