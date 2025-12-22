@@ -1,21 +1,59 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
+import { format } from 'date-fns';
+
+interface ProfessionalSchedule {
+  useBusinessHours: boolean;
+  workDays: number[];
+  workHours: {
+    morningStart?: string;
+    morningEnd?: string;
+    afternoonStart?: string;
+    afternoonEnd?: string;
+  };
+}
+
+interface BusinessHour {
+  day_of_week: number;
+  is_open: boolean;
+  periods: {
+    morningStart?: string;
+    morningEnd?: string;
+    afternoonStart?: string;
+    afternoonEnd?: string;
+  } | null;
+}
+
+interface DateBlock {
+  date: string;
+  all_day: boolean;
+  start_time: string | null;
+  end_time: string | null;
+  professional_id: string | null;
+}
 
 interface DateTimeSelectProps {
   selectedDate: Date | null;
   selectedTime: string | null;
   onDateSelect: (date: Date) => void;
   onTimeSelect: (time: string) => void;
+  professionalSchedule?: ProfessionalSchedule | null;
+  businessHours?: BusinessHour[];
+  dateBlocks?: DateBlock[];
+  professionalId?: string | null;
 }
 
-const timeSlots = [
-  '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
-  '14:00', '14:30', '15:00', '15:30', '16:00', '16:30',
-  '17:00', '17:30', '18:00', '18:30', '19:00', '19:30',
-];
-
-export function DateTimeSelect({ selectedDate, selectedTime, onDateSelect, onTimeSelect }: DateTimeSelectProps) {
+export function DateTimeSelect({ 
+  selectedDate, 
+  selectedTime, 
+  onDateSelect, 
+  onTimeSelect,
+  professionalSchedule,
+  businessHours = [],
+  dateBlocks = [],
+  professionalId
+}: DateTimeSelectProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   
   const daysInMonth = new Date(
@@ -40,9 +78,43 @@ export function DateTimeSelect({ selectedDate, selectedTime, onDateSelect, onTim
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
+  // Get working days based on professional schedule or business hours
+  const getWorkingDays = (): number[] => {
+    if (professionalSchedule) {
+      if (professionalSchedule.useBusinessHours && businessHours.length > 0) {
+        return businessHours
+          .filter(bh => bh.is_open)
+          .map(bh => bh.day_of_week);
+      }
+      return professionalSchedule.workDays || [1, 2, 3, 4, 5, 6];
+    }
+    
+    // Default: Mon-Sat
+    return [1, 2, 3, 4, 5, 6];
+  };
+
+  const workingDays = getWorkingDays();
+
   const isDateDisabled = (day: number) => {
     const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
-    return date < today || date.getDay() === 0; // Disable past dates and Sundays
+    const dayOfWeek = date.getDay();
+    const dateStr = format(date, 'yyyy-MM-dd');
+    
+    // Past dates
+    if (date < today) return true;
+    
+    // Check if this day is a working day
+    if (!workingDays.includes(dayOfWeek)) return true;
+    
+    // Check for all-day blocks
+    const hasAllDayBlock = dateBlocks.some(block => 
+      block.date === dateStr && 
+      block.all_day && 
+      (block.professional_id === professionalId || block.professional_id === null)
+    );
+    if (hasAllDayBlock) return true;
+    
+    return false;
   };
 
   const isSameDay = (day: number) => {
@@ -61,6 +133,91 @@ export function DateTimeSelect({ selectedDate, selectedTime, onDateSelect, onTim
   const handleNextMonth = () => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
   };
+
+  // Generate time slots based on professional schedule or business hours
+  const timeSlots = useMemo(() => {
+    if (!selectedDate) return [];
+    
+    const dayOfWeek = selectedDate.getDay();
+    let periods: { morningStart?: string; morningEnd?: string; afternoonStart?: string; afternoonEnd?: string } | null = null;
+    
+    // Get periods from schedule
+    if (professionalSchedule) {
+      if (professionalSchedule.useBusinessHours && businessHours.length > 0) {
+        const businessDay = businessHours.find(bh => bh.day_of_week === dayOfWeek);
+        periods = businessDay?.periods || null;
+      } else {
+        periods = professionalSchedule.workHours || null;
+      }
+    } else if (businessHours.length > 0) {
+      const businessDay = businessHours.find(bh => bh.day_of_week === dayOfWeek);
+      periods = businessDay?.periods || null;
+    }
+    
+    // Default hours if nothing configured
+    if (!periods) {
+      periods = {
+        morningStart: '09:00',
+        morningEnd: '12:00',
+        afternoonStart: '14:00',
+        afternoonEnd: '19:00'
+      };
+    }
+    
+    const slots: string[] = [];
+    
+    // Generate morning slots
+    if (periods.morningStart && periods.morningEnd) {
+      const [startH, startM] = periods.morningStart.split(':').map(Number);
+      const [endH, endM] = periods.morningEnd.split(':').map(Number);
+      
+      let currentH = startH;
+      let currentM = startM;
+      
+      while (currentH < endH || (currentH === endH && currentM < endM)) {
+        slots.push(`${String(currentH).padStart(2, '0')}:${String(currentM).padStart(2, '0')}`);
+        currentM += 30;
+        if (currentM >= 60) {
+          currentH += 1;
+          currentM = 0;
+        }
+      }
+    }
+    
+    // Generate afternoon slots
+    if (periods.afternoonStart && periods.afternoonEnd) {
+      const [startH, startM] = periods.afternoonStart.split(':').map(Number);
+      const [endH, endM] = periods.afternoonEnd.split(':').map(Number);
+      
+      let currentH = startH;
+      let currentM = startM;
+      
+      while (currentH < endH || (currentH === endH && currentM < endM)) {
+        slots.push(`${String(currentH).padStart(2, '0')}:${String(currentM).padStart(2, '0')}`);
+        currentM += 30;
+        if (currentM >= 60) {
+          currentH += 1;
+          currentM = 0;
+        }
+      }
+    }
+    
+    // Filter out blocked time slots
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    const blocksForDay = dateBlocks.filter(block => 
+      block.date === dateStr && 
+      !block.all_day &&
+      (block.professional_id === professionalId || block.professional_id === null)
+    );
+    
+    return slots.filter(slot => {
+      const slotTime = slot;
+      return !blocksForDay.some(block => {
+        if (!block.start_time || !block.end_time) return false;
+        return slotTime >= block.start_time && slotTime < block.end_time;
+      });
+    });
+  }, [selectedDate, professionalSchedule, businessHours, dateBlocks, professionalId]);
 
   return (
     <div className="space-y-6">
@@ -143,22 +300,28 @@ export function DateTimeSelect({ selectedDate, selectedTime, onDateSelect, onTim
           <p className="text-sm text-muted-foreground text-center">
             Horários disponíveis
           </p>
-          <div className="grid grid-cols-4 gap-2">
-            {timeSlots.map((time) => (
-              <motion.button
-                key={time}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => onTimeSelect(time)}
-                className={`py-3 px-2 rounded-lg text-sm font-medium transition-all ${
-                  selectedTime === time
-                    ? 'bg-gold text-primary-foreground shadow-gold'
-                    : 'bg-secondary text-foreground hover:bg-muted'
-                }`}
-              >
-                {time}
-              </motion.button>
-            ))}
-          </div>
+          {timeSlots.length > 0 ? (
+            <div className="grid grid-cols-4 gap-2">
+              {timeSlots.map((time) => (
+                <motion.button
+                  key={time}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => onTimeSelect(time)}
+                  className={`py-3 px-2 rounded-lg text-sm font-medium transition-all ${
+                    selectedTime === time
+                      ? 'bg-gold text-primary-foreground shadow-gold'
+                      : 'bg-secondary text-foreground hover:bg-muted'
+                  }`}
+                >
+                  {time}
+                </motion.button>
+              ))}
+            </div>
+          ) : (
+            <p className="text-center text-muted-foreground py-4">
+              Nenhum horário disponível para esta data
+            </p>
+          )}
         </motion.div>
       )}
     </div>

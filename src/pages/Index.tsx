@@ -21,11 +21,23 @@ const stepLabels = [
 ];
 
 
+interface ProfessionalSchedule {
+  useBusinessHours: boolean;
+  workDays: number[];
+  workHours: {
+    morningStart?: string;
+    morningEnd?: string;
+    afternoonStart?: string;
+    afternoonEnd?: string;
+  };
+}
+
 interface Professional {
   id: string;
   nome: string;
   especialidade: string | null;
   avatar_url: string | null;
+  schedule: ProfessionalSchedule | null;
 }
 
 interface Service {
@@ -50,6 +62,25 @@ interface LoyaltyConfig {
   min_amount_for_points: number;
 }
 
+interface BusinessHour {
+  day_of_week: number;
+  is_open: boolean;
+  periods: {
+    morningStart?: string;
+    morningEnd?: string;
+    afternoonStart?: string;
+    afternoonEnd?: string;
+  } | null;
+}
+
+interface DateBlock {
+  date: string;
+  all_day: boolean;
+  start_time: string | null;
+  end_time: string | null;
+  professional_id: string | null;
+}
+
 const Index = () => {
   const [showWizard, setShowWizard] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
@@ -61,6 +92,8 @@ const Index = () => {
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [loyaltyConfig, setLoyaltyConfig] = useState<LoyaltyConfig | null>(null);
+  const [businessHours, setBusinessHours] = useState<BusinessHour[]>([]);
+  const [dateBlocks, setDateBlocks] = useState<DateBlock[]>([]);
 
   // Booking state
   const [selectedProfessional, setSelectedProfessional] = useState<string | null>(null);
@@ -105,14 +138,17 @@ const Index = () => {
         if (tenantData) {
           setTenant(tenantData);
 
-          // Fetch professionals
+          // Fetch professionals with schedule
           const { data: prosData } = await supabase
             .from('professionals')
-            .select('id, nome, especialidade, avatar_url')
+            .select('id, nome, especialidade, avatar_url, schedule')
             .eq('tenant_id', tenantData.id)
             .eq('ativo', true);
 
-          setProfessionals(prosData || []);
+          setProfessionals((prosData || []).map(p => ({
+            ...p,
+            schedule: p.schedule as unknown as ProfessionalSchedule | null
+          })));
 
           // Fetch services
           const { data: servicesData } = await supabase
@@ -133,6 +169,33 @@ const Index = () => {
           if (loyaltyData) {
             setLoyaltyConfig(loyaltyData as LoyaltyConfig);
           }
+
+          // Fetch business hours
+          const { data: businessHoursData } = await supabase
+            .from('business_hours')
+            .select('day_of_week, is_open, periods')
+            .eq('tenant_id', tenantData.id);
+
+          setBusinessHours((businessHoursData || []).map(bh => ({
+            day_of_week: bh.day_of_week,
+            is_open: bh.is_open ?? false,
+            periods: bh.periods as BusinessHour['periods']
+          })));
+
+          // Fetch date blocks
+          const { data: dateBlocksData } = await supabase
+            .from('date_blocks')
+            .select('date, all_day, start_time, end_time, professional_id')
+            .eq('tenant_id', tenantData.id)
+            .gte('date', new Date().toISOString().split('T')[0]);
+
+          setDateBlocks((dateBlocksData || []).map(db => ({
+            date: db.date,
+            all_day: db.all_day ?? true,
+            start_time: db.start_time,
+            end_time: db.end_time,
+            professional_id: db.professional_id
+          })));
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -458,6 +521,10 @@ const Index = () => {
                       selectedTime={selectedTime}
                       onDateSelect={setSelectedDate}
                       onTimeSelect={setSelectedTime}
+                      professionalSchedule={professionals.find(p => p.id === selectedProfessional)?.schedule}
+                      businessHours={businessHours}
+                      dateBlocks={dateBlocks}
+                      professionalId={selectedProfessional}
                     />
                   </motion.div>
                 )}
