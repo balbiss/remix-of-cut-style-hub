@@ -190,7 +190,7 @@ const AdminSettings = () => {
 
   return (
     <AdminLayout>
-      <div className="space-y-6 max-w-4xl overflow-hidden">
+      <div className="space-y-6 w-full max-w-4xl overflow-hidden">
         {/* Page Header */}
         <div>
           <h1 className="font-display text-2xl sm:text-3xl font-bold text-foreground flex items-center gap-2 sm:gap-3">
@@ -203,7 +203,7 @@ const AdminSettings = () => {
         </div>
 
         <Tabs defaultValue="schedule" className="space-y-4 sm:space-y-6">
-          <TabsList className="bg-secondary/50 p-1 w-full flex overflow-x-auto">
+          <TabsList className="bg-secondary/50 p-1 w-full grid grid-cols-2 sm:flex sm:flex-row gap-1 h-auto">
             <TabsTrigger
               value="schedule"
               className="flex-1 min-w-0 text-xs sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
@@ -419,30 +419,34 @@ const AdminSettings = () => {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 p-3 bg-secondary rounded-lg font-mono text-sm truncate">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <div className="flex-1 p-3 bg-secondary rounded-lg font-mono text-xs sm:text-sm break-all">
                       {`${window.location.origin}/b/${businessSlug}`}
                     </div>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => {
-                        navigator.clipboard.writeText(`${window.location.origin}/b/${businessSlug}`);
-                        toast({
-                          title: 'Link copiado!',
-                          description: 'O link foi copiado para sua área de transferência.',
-                        });
-                      }}
-                    >
-                      <Copy className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={() => window.open(`/b/${businessSlug}`, '_blank')}
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </Button>
+                    <div className="flex gap-2 shrink-0">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="shrink-0"
+                        onClick={() => {
+                          navigator.clipboard.writeText(`${window.location.origin}/b/${businessSlug}`);
+                          toast({
+                            title: 'Link copiado!',
+                            description: 'O link foi copiado para sua área de transferência.',
+                          });
+                        }}
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="shrink-0"
+                        onClick={() => window.open(`/b/${businessSlug}`, '_blank')}
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                   
                   <div className="space-y-2">
