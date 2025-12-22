@@ -23,7 +23,7 @@ import {
 import { toast } from 'sonner';
 
 const AdminProfissionais = () => {
-  const { professionals, loading, addProfessional, updateProfessional, deleteProfessional } = useProfessionals();
+  const { professionals, loading, addProfessional, updateProfessional, deleteProfessional, createBarberUser } = useProfessionals();
   const { dateBlocks, addDateBlock, deleteDateBlock } = useDateBlocks();
   const [formOpen, setFormOpen] = useState(false);
   const [scheduleFormOpen, setScheduleFormOpen] = useState(false);
@@ -297,6 +297,7 @@ const AdminProfissionais = () => {
         onOpenChange={setFormOpen}
         professional={editingProfessional}
         onSave={handleSave}
+        onCreateLogin={createBarberUser}
       />
 
       {/* Schedule Form */}

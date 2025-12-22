@@ -11,6 +11,9 @@ export interface Professional {
   telefone: string | null;
   especialidade: string | null;
   ativo: boolean;
+  email: string | null;
+  user_id: string | null;
+  commission_percent: number;
   schedule: {
     useBusinessHours: boolean;
     workDays: number[];
@@ -26,7 +29,7 @@ export interface Professional {
 export function useProfessionals() {
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [loading, setLoading] = useState(true);
-  const { tenant } = useAuth();
+  const { tenant, session } = useAuth();
 
   const fetchProfessionals = async () => {
     if (!tenant?.id) {
@@ -52,6 +55,9 @@ export function useProfessionals() {
         telefone: p.telefone,
         especialidade: p.especialidade,
         ativo: p.ativo ?? true,
+        email: p.email,
+        user_id: p.user_id,
+        commission_percent: p.commission_percent ?? 50,
         schedule: p.schedule as Professional['schedule'],
       }));
 
@@ -68,7 +74,7 @@ export function useProfessionals() {
     fetchProfessionals();
   }, [tenant?.id]);
 
-  const addProfessional = async (data: Omit<Professional, 'id' | 'tenant_id'>) => {
+  const addProfessional = async (data: Omit<Professional, 'id' | 'tenant_id' | 'user_id'>) => {
     if (!tenant?.id) return null;
 
     try {
@@ -81,6 +87,8 @@ export function useProfessionals() {
           telefone: data.telefone,
           especialidade: data.especialidade,
           ativo: data.ativo,
+          email: data.email,
+          commission_percent: data.commission_percent,
           schedule: data.schedule as any,
         })
         .select()
@@ -107,6 +115,8 @@ export function useProfessionals() {
           telefone: data.telefone,
           especialidade: data.especialidade,
           ativo: data.ativo,
+          email: data.email,
+          commission_percent: data.commission_percent,
           schedule: data.schedule as any,
         })
         .eq('id', id);
@@ -140,6 +150,43 @@ export function useProfessionals() {
     }
   };
 
+  const createBarberUser = async (
+    professionalId: string,
+    email: string,
+    password: string,
+    nome: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    if (!tenant?.id || !session?.access_token) {
+      return { success: false, error: 'Não autorizado' };
+    }
+
+    try {
+      const response = await supabase.functions.invoke('create-barber-user', {
+        body: {
+          email,
+          password,
+          nome,
+          professionalId,
+          tenantId: tenant.id,
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      if (!response.data.success) {
+        throw new Error(response.data.error || 'Erro ao criar usuário');
+      }
+
+      await fetchProfessionals();
+      return { success: true };
+    } catch (error: any) {
+      console.error('Error creating barber user:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
   return {
     professionals,
     loading,
@@ -147,5 +194,6 @@ export function useProfessionals() {
     addProfessional,
     updateProfessional,
     deleteProfessional,
+    createBarberUser,
   };
 }
