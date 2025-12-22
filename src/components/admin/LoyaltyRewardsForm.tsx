@@ -117,9 +117,9 @@ export function LoyaltyRewardsForm() {
     <>
       <Card variant="elevated">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                 <Gift className="w-6 h-6 text-primary" />
               </div>
               <div>
@@ -132,6 +132,7 @@ export function LoyaltyRewardsForm() {
             <Button
               variant="gold"
               size="sm"
+              className="w-full sm:w-auto"
               onClick={() => {
                 resetForm();
                 setIsDialogOpen(true);
@@ -162,27 +163,27 @@ export function LoyaltyRewardsForm() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, x: -20 }}
-                    className={`flex items-center justify-between p-4 rounded-lg border ${
+                    className={`flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border gap-3 ${
                       reward.active
                         ? 'bg-secondary/30 border-border'
                         : 'bg-muted/20 border-muted opacity-60'
                     }`}
                   >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
                         <Star className="w-5 h-5 text-gold" />
                       </div>
-                      <div>
-                        <h4 className="font-medium text-foreground">{reward.nome}</h4>
+                      <div className="min-w-0">
+                        <h4 className="font-medium text-foreground truncate">{reward.nome}</h4>
                         <p className="text-sm text-muted-foreground">
-                          {reward.points_required} pontos • {getRewardTypeLabel(reward.reward_type)}
+                          {reward.points_required} pts • {getRewardTypeLabel(reward.reward_type)}
                           {reward.reward_type === 'discount' && reward.reward_value > 0 && (
                             <span> de {formatCurrency(reward.reward_value)}</span>
                           )}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
                       <Button
                         variant="ghost"
                         size="icon"
