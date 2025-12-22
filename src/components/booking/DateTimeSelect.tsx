@@ -33,6 +33,11 @@ interface DateBlock {
   professional_id: string | null;
 }
 
+interface Appointment {
+  data_hora: string;
+  service_duration: number;
+}
+
 interface DateTimeSelectProps {
   selectedDate: Date | null;
   selectedTime: string | null;
@@ -42,6 +47,8 @@ interface DateTimeSelectProps {
   businessHours?: BusinessHour[];
   dateBlocks?: DateBlock[];
   professionalId?: string | null;
+  appointments?: Appointment[];
+  serviceDuration?: number;
 }
 
 export function DateTimeSelect({ 
@@ -52,7 +59,9 @@ export function DateTimeSelect({
   professionalSchedule,
   businessHours = [],
   dateBlocks = [],
-  professionalId
+  professionalId,
+  appointments = [],
+  serviceDuration = 30
 }: DateTimeSelectProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   
@@ -210,14 +219,48 @@ export function DateTimeSelect({
       (block.professional_id === professionalId || block.professional_id === null)
     );
     
+    // Helper to convert time string to minutes
+    const timeToMinutes = (time: string) => {
+      const [h, m] = time.split(':').map(Number);
+      return h * 60 + m;
+    };
+    
+    // Filter appointments for this date
+    const appointmentsForDay = appointments.filter(apt => {
+      const aptDate = new Date(apt.data_hora);
+      return format(aptDate, 'yyyy-MM-dd') === dateStr;
+    });
+    
     return slots.filter(slot => {
       const slotTime = slot;
-      return !blocksForDay.some(block => {
+      const slotMinutes = timeToMinutes(slotTime);
+      
+      // Check if blocked by date block
+      const isBlocked = blocksForDay.some(block => {
         if (!block.start_time || !block.end_time) return false;
         return slotTime >= block.start_time && slotTime < block.end_time;
       });
+      if (isBlocked) return false;
+      
+      // Check if occupied by existing appointment
+      const isOccupied = appointmentsForDay.some(apt => {
+        const aptDate = new Date(apt.data_hora);
+        const aptTime = `${String(aptDate.getHours()).padStart(2, '0')}:${String(aptDate.getMinutes()).padStart(2, '0')}`;
+        const aptMinutes = timeToMinutes(aptTime);
+        const aptDuration = apt.service_duration || 30;
+        
+        // Check if the slot falls within an existing appointment's time range
+        // Slot is occupied if: slot starts during appointment OR appointment starts during slot's duration
+        const slotEndMinutes = slotMinutes + serviceDuration;
+        const aptEndMinutes = aptMinutes + aptDuration;
+        
+        // Overlap check: slots overlap if one starts before the other ends
+        return (slotMinutes < aptEndMinutes && slotEndMinutes > aptMinutes);
+      });
+      
+      return !isOccupied;
     });
-  }, [selectedDate, professionalSchedule, businessHours, dateBlocks, professionalId]);
+  }, [selectedDate, professionalSchedule, businessHours, dateBlocks, professionalId, appointments, serviceDuration]);
 
   return (
     <div className="space-y-6">
