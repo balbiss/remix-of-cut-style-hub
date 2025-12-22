@@ -35,7 +35,6 @@ export default function SuperAdminTenants() {
 
       if (error) throw error;
 
-      // Fetch user counts for each tenant
       const tenantsWithCounts = await Promise.all(
         (tenantsData || []).map(async (tenant) => {
           const { count } = await supabase
@@ -73,37 +72,41 @@ export default function SuperAdminTenants() {
 
   return (
     <SuperAdminLayout>
-      <div className="p-8">
-        <div className="flex items-center justify-between mb-8">
+      <div className="p-4 md:p-6 lg:p-8">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Tenants</h1>
-            <p className="text-muted-foreground mt-1">
-              Gerencie todas as barbearias cadastradas
+            <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground">Tenants</h1>
+            <p className="text-muted-foreground text-sm mt-1">
+              Gerencie as barbearias
             </p>
           </div>
           <Button
             variant="outline"
             onClick={fetchTenants}
             disabled={loading}
-            className="gap-2"
+            size="sm"
+            className="gap-2 self-start sm:self-auto"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            Atualizar
+            <span className="hidden sm:inline">Atualizar</span>
           </Button>
         </div>
 
-        <div className="mb-6">
+        {/* Search */}
+        <div className="mb-4">
           <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por nome..."
+              placeholder="Buscar..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-9 h-10"
             />
           </div>
         </div>
 
+        {/* Table */}
         <TenantTable 
           tenants={filteredTenants} 
           loading={loading}
