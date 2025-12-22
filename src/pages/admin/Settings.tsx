@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
+import { QRCodeSVG } from 'qrcode.react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,6 +29,8 @@ import {
   Loader2,
   Copy,
   ExternalLink,
+  Download,
+  QrCode,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -445,6 +448,58 @@ const AdminSettings = () => {
                         onClick={() => window.open(`/b/${businessSlug}`, '_blank')}
                       >
                         <ExternalLink className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  {/* QR Code Section */}
+                  <div className="flex flex-col sm:flex-row items-center gap-4 p-4 bg-secondary/50 rounded-lg">
+                    <div className="bg-white p-3 rounded-lg">
+                      <QRCodeSVG
+                        id="qr-code"
+                        value={`${window.location.origin}/b/${businessSlug}`}
+                        size={120}
+                        level="H"
+                        includeMargin={false}
+                      />
+                    </div>
+                    <div className="flex-1 text-center sm:text-left space-y-2">
+                      <div className="flex items-center justify-center sm:justify-start gap-2">
+                        <QrCode className="w-5 h-5 text-primary" />
+                        <span className="font-medium">QR Code de Agendamento</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Imprima ou compartilhe este QR Code para que seus clientes acessem a página de agendamento rapidamente.
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const svg = document.getElementById('qr-code');
+                          if (svg) {
+                            const svgData = new XMLSerializer().serializeToString(svg);
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            const img = new window.Image();
+                            img.onload = () => {
+                              canvas.width = 400;
+                              canvas.height = 400;
+                              ctx?.fillRect(0, 0, 400, 400);
+                              ctx!.fillStyle = 'white';
+                              ctx?.fillRect(0, 0, 400, 400);
+                              ctx?.drawImage(img, 20, 20, 360, 360);
+                              const pngFile = canvas.toDataURL('image/png');
+                              const downloadLink = document.createElement('a');
+                              downloadLink.download = `qrcode-${businessSlug}.png`;
+                              downloadLink.href = pngFile;
+                              downloadLink.click();
+                            };
+                            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+                          }
+                        }}
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Baixar QR Code
                       </Button>
                     </div>
                   </div>
