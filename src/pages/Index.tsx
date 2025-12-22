@@ -93,20 +93,32 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="glass-strong sticky top-0 z-50 px-4 py-4">
-        <div className="flex items-center justify-center">
-          {showWizard && (
+        <div className="flex items-center justify-between">
+          {showWizard ? (
             <button
               onClick={handleBack}
-              className="absolute left-4 p-2 rounded-lg hover:bg-secondary transition-colors"
+              className="p-2 rounded-lg hover:bg-secondary transition-colors"
             >
               <ChevronLeft className="w-6 h-6 text-muted-foreground" />
             </button>
+          ) : (
+            <div className="w-10" /> 
           )}
           <DynamicLogo
             logoUrl={mockTenant.logo_url}
             businessName={mockTenant.nome}
             size="md"
           />
+          {!showWizard ? (
+            <a 
+              href="/admin" 
+              className="text-sm text-gold hover:text-gold-light transition-colors font-medium"
+            >
+              Entrar
+            </a>
+          ) : (
+            <div className="w-10" />
+          )}
         </div>
       </header>
 

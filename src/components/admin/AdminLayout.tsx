@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { DynamicLogo } from '@/components/DynamicLogo';
 import { DesktopHeader } from '@/components/admin/DesktopHeader';
 import { BottomNav } from '@/components/admin/BottomNav';
-import { mockTenant } from '@/lib/mock-data';
+import { SubscriptionBanner } from '@/components/admin/SubscriptionBanner';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   LayoutDashboard,
   Calendar,
@@ -37,6 +38,10 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const { isDesktop } = useResponsive();
+  const { tenant } = useAuth();
+
+  const logoUrl = tenant?.logo_url || null;
+  const businessName = tenant?.nome || 'BarberPro';
 
   return (
     <div className="min-h-screen bg-background flex w-full">
@@ -58,8 +63,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         {/* Logo */}
         <div className="p-6 border-b border-sidebar-border">
           <DynamicLogo
-            logoUrl={mockTenant.logo_url}
-            businessName={mockTenant.nome}
+            logoUrl={logoUrl}
+            businessName={businessName}
             size="md"
           />
         </div>
@@ -127,8 +132,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             {/* Logo */}
             <div className="p-6 border-b border-sidebar-border">
               <DynamicLogo
-                logoUrl={mockTenant.logo_url}
-                businessName={mockTenant.nome}
+                logoUrl={logoUrl}
+                businessName={businessName}
                 size="md"
               />
             </div>
@@ -183,8 +188,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         {/* Mobile Top Bar */}
         <header className="glass-strong sticky top-0 z-30 border-b border-border px-4 py-3 flex items-center justify-between lg:hidden">
           <DynamicLogo
-            logoUrl={mockTenant.logo_url}
-            businessName={mockTenant.nome}
+            logoUrl={logoUrl}
+            businessName={businessName}
             size="sm"
           />
           <Button
@@ -199,6 +204,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         {/* Page Content */}
         <main className="flex-1 p-4 lg:p-8 pb-24 lg:pb-8 overflow-x-hidden">
           <div className="max-w-7xl mx-auto">
+            <SubscriptionBanner />
             {children}
           </div>
         </main>
