@@ -79,6 +79,10 @@ const Booking = () => {
   const [earnedPoints, setEarnedPoints] = useState(0);
   const [totalPoints, setTotalPoints] = useState(0);
 
+  // Confirmation code for online payments
+  const [confirmationCode, setConfirmationCode] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'online' | 'local'>('local');
+
   // Fetch tenant by slug
   useEffect(() => {
     const fetchData = async () => {
@@ -211,6 +215,19 @@ const Booking = () => {
       const [hours, minutes] = selectedTime.split(':');
       appointmentDateTime.setHours(parseInt(hours), parseInt(minutes));
 
+      // Generate confirmation code for online payments
+      let code: string | null = null;
+      let prepaidAmount = 0;
+      let toleranceExpiresAt: string | null = null;
+
+      if (method === 'online') {
+        code = Math.floor(1000 + Math.random() * 9000).toString();
+        prepaidAmount = totalPrice * 0.5;
+        // Tolerance expires 10 minutes after scheduled time
+        const toleranceDate = new Date(appointmentDateTime.getTime() + 10 * 60 * 1000);
+        toleranceExpiresAt = toleranceDate.toISOString();
+      }
+
       const { error: appointmentError } = await supabase
         .from('appointments')
         .insert({
@@ -220,7 +237,11 @@ const Booking = () => {
           cliente_nome: clientName,
           cliente_zap: clientPhone,
           data_hora: appointmentDateTime.toISOString(),
-          status: 'confirmed',
+          status: method === 'online' ? 'confirmed' : 'pending',
+          confirmation_code: code,
+          prepaid_amount: prepaidAmount,
+          payment_method: method,
+          tolerance_expires_at: toleranceExpiresAt,
         });
 
       if (appointmentError) throw appointmentError;
@@ -277,6 +298,8 @@ const Booking = () => {
         }
       }
 
+      setConfirmationCode(code);
+      setPaymentMethod(method);
       setIsSuccess(true);
     } catch (error) {
       console.error('Error creating appointment:', error);
@@ -314,6 +337,8 @@ const Booking = () => {
         loyaltyPoints={totalPoints}
         earnedPoints={earnedPoints}
         loyaltyEnabled={loyaltyConfig?.enabled || false}
+        confirmationCode={confirmationCode}
+        paymentMethod={paymentMethod}
       />
     );
   }

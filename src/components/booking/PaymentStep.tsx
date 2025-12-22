@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { CreditCard, Banknote, Calendar, Clock, User, Scissors } from 'lucide-react';
+import { CreditCard, Banknote, Calendar, Clock, User, Scissors, AlertTriangle } from 'lucide-react';
 
 interface Professional {
   id: string;
@@ -36,6 +36,7 @@ export function PaymentStep({
 }: PaymentStepProps) {
   const total = services.reduce((sum, s) => sum + s.preco, 0);
   const totalDuration = services.reduce((sum, s) => sum + s.duracao, 0);
+  const prepaidAmount = total * 0.5;
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -61,6 +62,25 @@ export function PaymentStep({
       <h2 className="font-display text-xl font-semibold text-center text-foreground">
         Resumo do Agendamento
       </h2>
+
+      {/* Tolerance Policy Banner */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ delay: 0.1 }}
+        className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30"
+      >
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="font-semibold text-amber-500 text-sm">Política de Tolerância</p>
+            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+              Você tem até <strong className="text-foreground">10 minutos</strong> após o horário marcado para chegar. 
+              Após esse período, sua reserva será liberada e você poderá aguardar uma vaga ou remarcar.
+            </p>
+          </div>
+        </div>
+      </motion.div>
 
       {/* Summary Card */}
       <div className="bg-card rounded-xl border border-border p-4 space-y-4">
@@ -124,6 +144,8 @@ export function PaymentStep({
           >
             <CreditCard className="w-6 h-6 mb-2" />
             <span>Pagar Online</span>
+            <span className="text-xs opacity-80 mt-1">50% antecipado</span>
+            <span className="text-xs font-bold mt-1">{formatPrice(prepaidAmount)}</span>
           </Button>
           <Button
             variant="outline"
@@ -133,6 +155,8 @@ export function PaymentStep({
           >
             <Banknote className="w-6 h-6 mb-2" />
             <span>Pagar no Local</span>
+            <span className="text-xs opacity-80 mt-1">Valor total</span>
+            <span className="text-xs font-bold mt-1">{formatPrice(total)}</span>
           </Button>
         </div>
       </div>
