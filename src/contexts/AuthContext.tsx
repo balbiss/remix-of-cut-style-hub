@@ -32,6 +32,7 @@ interface AuthContextType {
   isSubscriptionActive: boolean;
   signUp: (email: string, password: string, nome: string, barbeariaNome: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signInWithGoogle: () => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshTenant: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
@@ -172,6 +173,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setTenant(null);
   };
 
+  const signInWithGoogle = async () => {
+    const redirectUrl = `${window.location.origin}/admin`;
+    
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: redirectUrl,
+      },
+    });
+
+    return { error: error as Error | null };
+  };
+
   const resetPassword = async (email: string) => {
     const redirectUrl = `${window.location.origin}/reset-password`;
     
@@ -193,6 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isSubscriptionActive,
         signUp,
         signIn,
+        signInWithGoogle,
         signOut,
         refreshTenant,
         resetPassword,
