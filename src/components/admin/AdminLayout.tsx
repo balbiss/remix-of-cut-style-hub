@@ -83,16 +83,16 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       {/* Desktop Sidebar (Fixed) */}
       <aside className="hidden lg:flex fixed inset-y-0 left-0 z-50 w-64 bg-sidebar border-r border-sidebar-border flex-col">
         {/* Logo */}
-        <div className="p-4 border-b border-sidebar-border">
+        <div className="px-4 py-5 border-b border-sidebar-border">
           <DynamicLogo
             logoUrl={logoUrl}
             businessName={businessName}
-            size="md"
+            size="sm"
           />
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {navItems.map((item) => {
             const isActive = item.end
               ? location.pathname === item.to
@@ -105,13 +105,13 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               <NavLink
                 key={item.to}
                 to={item.to}
-                className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg font-medium transition-all duration-200 ${
+                className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-200 ${
                   active
-                    ? 'bg-sidebar-accent text-gold'
-                    : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
+                    ? 'bg-sidebar-accent text-gold font-medium'
+                    : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-foreground'
                 }`}
               >
-                <item.icon className={`w-5 h-5 ${active ? 'text-gold' : ''}`} />
+                <item.icon className={`w-4 h-4 ${active ? 'text-gold' : ''}`} />
                 <span>{item.label}</span>
               </NavLink>
             );
@@ -119,12 +119,12 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         </nav>
 
         {/* Footer */}
-        <div className="p-3 border-t border-sidebar-border">
+        <div className="px-3 py-4 border-t border-sidebar-border">
           <button
             onClick={openLogoutDialog}
-            className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-destructive hover:bg-destructive/10 transition-all duration-200 w-full"
+            className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-sidebar-foreground/60 hover:text-destructive hover:bg-destructive/10 transition-all duration-200 w-full"
           >
-            <LogOut className="w-5 h-5" />
+            <LogOut className="w-4 h-4" />
             <span>Sair</span>
           </button>
         </div>
@@ -152,16 +152,16 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             </div>
 
             {/* Logo */}
-            <div className="p-4 border-b border-sidebar-border">
+            <div className="px-4 py-5 border-b border-sidebar-border">
               <DynamicLogo
                 logoUrl={logoUrl}
                 businessName={businessName}
-                size="md"
+                size="sm"
               />
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+            <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
               {navItems.map((item) => {
                 const isActive = item.end
                   ? location.pathname === item.to
@@ -175,13 +175,13 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                     key={item.to}
                     to={item.to}
                     onClick={() => setSidebarOpen(false)}
-                    className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg font-medium transition-all duration-200 ${
+                    className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-all duration-200 ${
                       active
-                        ? 'bg-sidebar-accent text-gold'
-                        : 'text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-foreground'
+                        ? 'bg-sidebar-accent text-gold font-medium'
+                        : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-foreground'
                     }`}
                   >
-                    <item.icon className={`w-5 h-5 ${active ? 'text-gold' : ''}`} />
+                    <item.icon className={`w-4 h-4 ${active ? 'text-gold' : ''}`} />
                     <span>{item.label}</span>
                   </NavLink>
                 );
@@ -189,12 +189,12 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             </nav>
 
             {/* Footer */}
-            <div className="p-3 border-t border-sidebar-border pb-20">
+            <div className="px-3 py-4 border-t border-sidebar-border pb-20">
               <button
                 onClick={openLogoutDialog}
-                className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-destructive hover:bg-destructive/10 transition-all duration-200 w-full"
+                className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-sidebar-foreground/60 hover:text-destructive hover:bg-destructive/10 transition-all duration-200 w-full"
               >
-                <LogOut className="w-5 h-5" />
+                <LogOut className="w-4 h-4" />
                 <span>Sair</span>
               </button>
             </div>
