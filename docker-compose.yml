@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  app:
+    image: ghcr.io/balbiss/remix-of-cut-style-hub:latest
+    # ports: # Mapeamento direto desabilitado em favor do Traefik
+    #   - "8080:80"
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: stop-first
+      labels:
+        - traefik.enable=true
+        # Router HTTPS (barberpro)
+        - traefik.http.routers.barberpro-https.rule=Host(`barberpro.linootec.com.br`)
+        - traefik.http.routers.barberpro-https.entrypoints=websecure
+        - traefik.http.routers.barberpro-https.tls.certresolver=letsencryptresolver
+        - traefik.http.routers.barberpro-https.service=barberpro-svc
+        # Service
+        - traefik.http.services.barberpro-svc.loadbalancer.server.port=80
+        - traefik.docker.network=inoovaweb # Rede externa definida pelo usuário
+    networks:
+      - app_network
+      - inoovaweb
+
+networks:
+  app_network:
+    driver: overlay
+  inoovaweb:
+    external: true
+    name: inoovaweb

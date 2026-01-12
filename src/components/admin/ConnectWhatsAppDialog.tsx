@@ -106,7 +106,7 @@ export function ConnectWhatsAppDialog({ open, onOpenChange, onSuccess }: Connect
       await supabase
         .from('tenants')
         .update({
-          evolution_api_url: `${import.meta.env.VITE_WHATSAPP_API_URL || 'https://weeb.inoovaweb.com.br'}`,
+          evolution_api_url: '/api/whatsapp',
           evolution_api_token: apiResult.instance.token,
           updated_at: new Date().toISOString(),
         })
@@ -122,7 +122,7 @@ export function ConnectWhatsAppDialog({ open, onOpenChange, onSuccess }: Connect
       console.error('Error creating WhatsApp instance:', error);
       setStep('error');
       setErrorMessage(error.message || 'Erro ao criar instância. Tente novamente.');
-      
+
       toast.error(error.message || 'Não foi possível criar a instância.');
       setIsCreating(false);
     }
@@ -146,7 +146,7 @@ export function ConnectWhatsAppDialog({ open, onOpenChange, onSuccess }: Connect
 
       setPairCode(result.code);
       toast.success('Código gerado com sucesso!');
-      
+
       // Iniciar verificação automática de status
       // Após inserir o código no WhatsApp, a conexão será estabelecida automaticamente
       startStatusCheck(createdInstanceName, instanceToken);
@@ -169,7 +169,7 @@ export function ConnectWhatsAppDialog({ open, onOpenChange, onSuccess }: Connect
     try {
       // Obter QR Code usando o token do usuário
       const qrcodeData = await getInstanceQRCode(createdInstanceName, instanceToken);
-      
+
       if (!qrcodeData) {
         throw new Error('Não foi possível obter o QR Code. Tente novamente.');
       }
@@ -187,7 +187,7 @@ export function ConnectWhatsAppDialog({ open, onOpenChange, onSuccess }: Connect
 
       setQrcode(qrcodeData);
       setStep('qrcode');
-      
+
       // Iniciar verificação de status
       startStatusCheck(createdInstanceName, instanceToken);
     } catch (error: any) {
@@ -206,20 +206,20 @@ export function ConnectWhatsAppDialog({ open, onOpenChange, onSuccess }: Connect
 
     checkInterval = setInterval(async () => {
       attempts++;
-      
+
       console.log(`[${new Date().toLocaleTimeString()}] Verificando status (tentativa ${attempts}/${maxAttempts})...`);
-      
+
       try {
         const status = await getInstanceStatus(instanceName, apiToken);
-        
+
         console.log(`[${new Date().toLocaleTimeString()}] Status retornado:`, status);
-        
+
         if (status.status === 'online') {
           if (checkInterval) clearInterval(checkInterval);
           setCheckingStatus(false);
-          
+
           console.log('✅ Conexão detectada! Atualizando banco de dados...');
-          
+
           // Atualizar conexão no banco
           if (connectionId) {
             const { error: updateError } = await supabase
@@ -240,9 +240,9 @@ export function ConnectWhatsAppDialog({ open, onOpenChange, onSuccess }: Connect
 
           // Atualizar tenant também
           await refreshTenant();
-          
+
           setStep('success');
-          
+
           toast.success('WhatsApp conectado com sucesso!');
 
           // Resetar formulário e fechar modal após 2 segundos
@@ -527,7 +527,7 @@ export function ConnectWhatsAppDialog({ open, onOpenChange, onSuccess }: Connect
                   Digite este código no WhatsApp quando solicitado. A conexão será estabelecida automaticamente.
                 </p>
               </div>
-              
+
               {errorMessage && (
                 <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
                   <AlertCircle className="w-4 h-4" />
@@ -541,7 +541,7 @@ export function ConnectWhatsAppDialog({ open, onOpenChange, onSuccess }: Connect
                   <span>Aguardando conexão...</span>
                 </div>
               )}
-              
+
               <div className="flex gap-2">
                 <Button
                   variant="outline"

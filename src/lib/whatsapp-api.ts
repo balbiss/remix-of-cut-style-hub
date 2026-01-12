@@ -3,9 +3,9 @@
 
 // Usar proxy em desenvolvimento para evitar CORS
 const IS_DEV = import.meta.env.DEV;
-const WHATSAPP_API_URL = IS_DEV 
+const WHATSAPP_API_URL = IS_DEV
   ? '/api/whatsapp'  // Proxy no Vite
-  : (import.meta.env.VITE_WHATSAPP_API_URL || 'https://weeb.inoovaweb.com.br');
+  : '/api/whatsapp'; // Sempre usar proxy em produção (configurado no Nginx)
 const WUZAPI_ADMIN_TOKEN = import.meta.env.VITE_WUZAPI_ADMIN_TOKEN || '44507d94623ef3c92c7c8b908b786836';
 
 // Remover barra final da URL se existir
@@ -166,9 +166,9 @@ export async function getInstanceStatus(
     // A API pode retornar os campos com diferentes capitalizações
     const connected = data.data?.Connected ?? data.data?.connected ?? data.Connected ?? data.connected;
     const loggedIn = data.data?.LoggedIn ?? data.data?.loggedIn ?? data.LoggedIn ?? data.loggedIn;
-    
+
     const isConnected = connected === true && loggedIn === true;
-    
+
     console.log('Status check parsed:', {
       connected,
       loggedIn,
@@ -179,7 +179,7 @@ export async function getInstanceStatus(
         topLevelKeys: Object.keys(data),
       },
     });
-    
+
     return {
       status: isConnected ? 'online' : 'offline',
       message: isConnected ? 'Conectado' : 'Desconectado',
@@ -215,7 +215,7 @@ export async function getInstanceQRCode(
           Immediate: false, // Aguardar para obter QR code
         }),
       });
-      
+
       console.log('Connect response status:', connectResponse.status);
       // Não importa se falhar, pode já estar conectado
     } catch (connectError) {
@@ -237,22 +237,22 @@ export async function getInstanceQRCode(
     if (response.ok) {
       const data = await response.json();
       console.log('QR Code response data:', data);
-      
+
       // Segundo a documentação: { "code": 200, "data": { "QRCode": "data:image/png;base64,..." }, "success": true }
       if (data.success && data.data?.QRCode) {
         const qrCode = data.data.QRCode;
-        
+
         // Se já está no formato data:image, retornar direto
         if (qrCode.startsWith('data:image')) {
           return qrCode;
         }
-        
+
         // Se é base64 puro, adicionar prefixo
         if (qrCode && typeof qrCode === 'string') {
           return `data:image/png;base64,${qrCode}`;
         }
       }
-      
+
       // Fallback para outros formatos possíveis
       if (data.data?.qrcode) {
         const qr = data.data.qrcode;
@@ -275,7 +275,7 @@ export async function getInstanceQRCode(
 
       if (response.ok) {
         const html = await response.text();
-        
+
         // Tentar encontrar base64 direto no HTML
         const base64Match = html.match(/data:image\/[^;]+;base64,([A-Za-z0-9+/=]+)/);
         if (base64Match && base64Match[1]) {
@@ -317,7 +317,7 @@ export async function generatePairCode(
 ): Promise<{ success: boolean; code?: string; error?: string }> {
   try {
     const cleanPhone = phoneNumber.replace(/\D/g, '');
-    
+
     console.log('Generating pair code:', {
       url: `${API_BASE_URL}/session/pairphone`,
       token: apiToken,
@@ -337,14 +337,14 @@ export async function generatePairCode(
           Immediate: true, // Retornar imediatamente sem esperar
         }),
       });
-      
+
       console.log('Connect response status:', connectResponse.status);
       // Não importa se falhar, pode já estar conectado
     } catch (connectError) {
       console.log('Connect attempt (may already be connected):', connectError);
       // Continuar mesmo se falhar
     }
-    
+
     // Segundo a documentação: POST /session/pairphone com { "Phone": "5491155553934" }
     const response = await fetch(`${API_BASE_URL}/session/pairphone`, {
       method: 'POST',
@@ -358,10 +358,10 @@ export async function generatePairCode(
     });
 
     console.log('Generate pair code response status:', response.status);
-    
+
     let data: any;
     const contentType = response.headers.get('content-type');
-    
+
     if (contentType?.includes('application/json')) {
       data = await response.json();
     } else {
@@ -379,7 +379,7 @@ export async function generatePairCode(
       // Se o erro for "no session", tentar conectar primeiro e depois gerar código novamente
       if (data.error === 'no session' || data.error?.includes('session')) {
         console.log('No session found, attempting to connect first...');
-        
+
         // Tentar conectar e aguardar um pouco
         try {
           const connectResponse = await fetch(`${API_BASE_URL}/session/connect`, {
@@ -392,11 +392,11 @@ export async function generatePairCode(
               Immediate: false, // Aguardar conexão
             }),
           });
-          
+
           if (connectResponse.ok) {
             // Aguardar um pouco para a sessão ser estabelecida
             await new Promise(resolve => setTimeout(resolve, 2000));
-            
+
             // Tentar gerar código novamente
             const retryResponse = await fetch(`${API_BASE_URL}/session/pairphone`, {
               method: 'POST',
@@ -408,9 +408,9 @@ export async function generatePairCode(
                 Phone: cleanPhone,
               }),
             });
-            
+
             const retryData = await retryResponse.json();
-            
+
             if (retryResponse.ok && retryData.success) {
               const linkingCode = retryData.data?.LinkingCode || retryData.LinkingCode;
               if (linkingCode) {
@@ -425,7 +425,7 @@ export async function generatePairCode(
           console.error('Error retrying after connect:', retryError);
         }
       }
-      
+
       return {
         success: false,
         error: data.error || data.message || `Erro ao gerar código (${response.status})`,
@@ -435,7 +435,7 @@ export async function generatePairCode(
     // Segundo a documentação, o código vem em data.LinkingCode
     // Exemplo: { "code": 200, "data": { "LinkingCode": "9H3J-H3J8" }, "success": true }
     const linkingCode = data.data?.LinkingCode || data.LinkingCode;
-    
+
     if (linkingCode) {
       return {
         success: true,
@@ -471,7 +471,7 @@ export async function pairPhone(
 ): Promise<{ success: boolean; message?: string; error?: string }> {
   try {
     const cleanPhone = phoneNumber.replace(/\D/g, '');
-    
+
     console.log('Validating pair code:', {
       url: `${API_BASE_URL}/session/pairphone`,
       token: apiToken,
@@ -494,10 +494,10 @@ export async function pairPhone(
     });
 
     console.log('Pair phone validation response status:', response.status);
-    
+
     let data: any;
     const contentType = response.headers.get('content-type');
-    
+
     if (contentType?.includes('application/json')) {
       data = await response.json();
     } else {
@@ -531,7 +531,7 @@ export async function pairPhone(
 async function checkConnectionStatus(apiToken: string): Promise<{ success: boolean; message?: string; error?: string }> {
   try {
     const statusResponse = await getInstanceStatus('', apiToken);
-    
+
     if (statusResponse.status === 'online') {
       return {
         success: true,
@@ -582,7 +582,7 @@ export async function checkWhatsAppUser(
 ): Promise<{ success: boolean; exists?: boolean; jid?: string; formattedPhone?: string; error?: string }> {
   try {
     const cleanPhone = phoneNumber.replace(/\D/g, '');
-    
+
     console.log('🔍 checkWhatsAppUser: Verificando número:', cleanPhone);
 
     // Segundo a documentação, Phone deve ser um array
@@ -599,7 +599,7 @@ export async function checkWhatsAppUser(
 
     const responseText = await response.text();
     console.log('🔍 checkWhatsAppUser: Status:', response.status, 'Response:', responseText);
-    
+
     let data: any;
     try {
       data = JSON.parse(responseText);
@@ -665,7 +665,7 @@ export async function sendTextMessage(
     // Primeiro, verificar se o número tem WhatsApp (obrigatório)
     console.log('📤 sendTextMessage: Verificando número antes de enviar...');
     const checkResult = await checkWhatsAppUser(apiToken, phoneNumber);
-    
+
     if (!checkResult.success) {
       console.error('❌ Erro ao verificar número:', checkResult.error);
       return {
@@ -685,13 +685,13 @@ export async function sendTextMessage(
     // Usar o número formatado retornado pela verificação
     // O número deve estar no formato internacional sem + e sem @s.whatsapp.net
     let verifiedPhone = checkResult.formattedPhone || phoneNumber.replace(/\D/g, '');
-    
+
     // Remover @s.whatsapp.net se presente
     verifiedPhone = verifiedPhone.replace(/@s\.whatsapp\.net$/, '');
-    
+
     // Garantir que o número está no formato correto (apenas dígitos)
     verifiedPhone = verifiedPhone.replace(/\D/g, '');
-    
+
     console.log('✅ Número verificado e formatado:', verifiedPhone, 'JID:', checkResult.jid);
 
     // Segundo a documentação WUZAPI: POST /chat/send/text
@@ -706,9 +706,9 @@ export async function sendTextMessage(
       Phone: verifiedPhone, // Número verificado (sem @s.whatsapp.net)
       Body: message, // Mensagem de texto
     };
-    
+
     console.log('📤 sendTextMessage: Enviando mensagem com payload:', payload);
-    
+
     const response = await fetch(`${API_BASE_URL}/chat/send/text`, {
       method: 'POST',
       headers: {
@@ -722,7 +722,7 @@ export async function sendTextMessage(
     const responseText = await response.text();
     console.log('📤 sendTextMessage: Response status:', response.status);
     console.log('📤 sendTextMessage: Response text:', responseText);
-    
+
     try {
       data = JSON.parse(responseText);
     } catch (e) {
@@ -737,7 +737,7 @@ export async function sendTextMessage(
         error: data.error || data.message || data.data?.message || 'Erro ao enviar mensagem',
       };
     }
-    
+
     console.log('✅ Mensagem enviada com sucesso:', data);
 
     return {
@@ -762,7 +762,7 @@ export async function getUserInfo(
 ): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
     console.log('🔍 getUserInfo: Buscando usuário com token:', apiToken?.substring(0, 10) + '...');
-    
+
     // Primeiro, buscar lista de usuários para encontrar o usuário pelo token
     const usersResponse = await fetch(`${API_BASE_URL}/admin/users`, {
       method: 'GET',
@@ -794,7 +794,7 @@ export async function getUserInfo(
         jid: u.jid,
       })) : null,
     });
-    
+
     if (!usersData.success || !Array.isArray(usersData.data)) {
       console.error('❌ getUserInfo: Formato inválido:', usersData);
       return {
@@ -805,7 +805,7 @@ export async function getUserInfo(
 
     // Encontrar o usuário pelo token
     const user = usersData.data.find((u: any) => u.token === apiToken);
-    
+
     console.log('🔍 getUserInfo: Usuário encontrado?', !!user);
     if (user) {
       console.log('✅ getUserInfo: Dados do usuário:', {
@@ -816,9 +816,9 @@ export async function getUserInfo(
         loggedIn: user.loggedIn,
       });
     }
-    
+
     if (!user) {
-      console.error('❌ getUserInfo: Usuário não encontrado. Tokens disponíveis:', 
+      console.error('❌ getUserInfo: Usuário não encontrado. Tokens disponíveis:',
         usersData.data.map((u: any) => u.token?.substring(0, 10) + '...')
       );
       return {
@@ -861,7 +861,7 @@ export async function getUserAvatar(
   try {
     const cleanPhone = phoneNumber.replace(/\D/g, '');
     console.log('🖼️ getUserAvatar: Buscando avatar para:', cleanPhone, 'preview:', preview);
-    
+
     const response = await fetch(`${API_BASE_URL}/user/avatar`, {
       method: 'POST',
       headers: {
@@ -887,15 +887,15 @@ export async function getUserAvatar(
 
     const data = await response.json();
     console.log('🖼️ getUserAvatar: Dados recebidos (completo):', JSON.stringify(data, null, 2));
-    
+
     // A API pode retornar em diferentes formatos:
     // Formato 1 (documentação): { "URL": "...", "ID": "...", "Type": "...", "DirectPath": "..." }
     // Formato 2 (real): { "code": 200, "data": { "URL": "...", "ID": "..." }, "success": true }
     // Formato 3: { "code": 200, "data": { "data": { "URL": "..." } }, "success": true }
-    
+
     let avatarUrl: string | undefined;
     let avatarId: string | undefined;
-    
+
     // Tentar diferentes estruturas de resposta
     if (data.URL) {
       // Formato direto (documentação)
@@ -918,7 +918,7 @@ export async function getUserAvatar(
       avatarUrl = data.data.url;
       avatarId = data.data.id;
     }
-    
+
     if (avatarUrl) {
       console.log('✅ getUserAvatar: Avatar encontrado:', avatarUrl);
       return {
@@ -955,7 +955,7 @@ export async function deleteInstance(
 ): Promise<{ success: boolean; message?: string; error?: string }> {
   try {
     console.log('Iniciando deleção da instância:', instanceName);
-    
+
     // 1. Primeiro fazer logout (termina a sessão completamente)
     try {
       console.log('1. Fazendo logout da sessão...');
@@ -1014,10 +1014,10 @@ export async function deleteInstance(
         const usersData = await usersResponse.json();
         if (usersData.success && usersData.data && Array.isArray(usersData.data)) {
           // Procurar usuário pelo nome ou token
-          const user = usersData.data.find((u: any) => 
+          const user = usersData.data.find((u: any) =>
             u.name === instanceName || u.token === apiToken
           );
-          
+
           if (user && user.id) {
             userId = user.id;
             console.log('✅ ID do usuário encontrado:', userId);
@@ -1074,7 +1074,7 @@ export async function deleteInstance(
     if (!deleteSuccess && !userId) {
       console.log('4. Tentando deletar pelo nome:', instanceName);
       const encodedInstanceName = encodeURIComponent(instanceName);
-      
+
       try {
         const deleteResponse = await fetch(`${API_BASE_URL}/admin/users/${encodedInstanceName}`, {
           method: 'DELETE',
