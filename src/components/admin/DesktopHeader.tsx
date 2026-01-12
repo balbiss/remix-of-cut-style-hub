@@ -3,6 +3,7 @@ import { Bell, Search, User, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
+import { NotificationsPanel } from '@/components/admin/NotificationsPanel';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,10 +55,7 @@ export function DesktopHeader() {
         </div>
 
         {/* Notifications */}
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="w-5 h-5 text-muted-foreground" />
-          <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-gold" />
-        </Button>
+        <NotificationsPanel />
 
         {/* User Dropdown */}
         <DropdownMenu>

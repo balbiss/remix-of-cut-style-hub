@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar, Clock, ChevronLeft, ChevronRight, Filter, Plus, Check, X, MoreVertical, Loader2 } from 'lucide-react';
+import { Calendar, Clock, ChevronLeft, ChevronRight, Filter, Plus, Check, X, MoreVertical, Loader2, RotateCcw } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { useResponsive } from '@/hooks/use-responsive';
@@ -16,6 +16,17 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 
 const timeSlots = [
   '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
@@ -32,6 +43,10 @@ const AdminAgenda = () => {
   const [selectedTime, setSelectedTime] = useState<string | undefined>();
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [refundDialogOpen, setRefundDialogOpen] = useState(false);
+  const [refundingId, setRefundingId] = useState<string | null>(null);
+  const [refundReason, setRefundReason] = useState('');
+  const [processingRefund, setProcessingRefund] = useState(false);
   const { isDesktop } = useResponsive();
 
   const today = selectedDate.toLocaleDateString('pt-BR', {
@@ -87,6 +102,82 @@ const AdminAgenda = () => {
   const handleCancel = (id: string) => {
     setCancellingId(id);
     setCancelDialogOpen(true);
+  };
+
+  const handleRefund = (id: string) => {
+    setRefundingId(id);
+    setRefundDialogOpen(true);
+  };
+
+  const confirmRefund = async () => {
+    if (!refundingId) return;
+
+    setProcessingRefund(true);
+    try {
+      // Buscar dados do agendamento
+      const appointment = appointments.find(a => a.id === refundingId);
+      if (!appointment || !appointment.pix_payment_id) {
+        toast.error('Agendamento não encontrado ou sem pagamento PIX');
+        setRefundDialogOpen(false);
+        setRefundingId(null);
+        setRefundReason('');
+        return;
+      }
+
+      // Chamar Edge Function para estorno
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+      const response = await fetch(
+        `${supabaseUrl}/functions/v1/refund-pix-payment`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': supabaseAnonKey,
+            'Authorization': `Bearer ${supabaseAnonKey}`,
+          },
+          body: JSON.stringify({
+            payment_id: appointment.pix_payment_id,
+            appointment_id: refundingId,
+            tenant_id: appointment.tenant_id,
+            reason: refundReason || 'Estorno solicitado pelo administrador',
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        // Atualizar agendamento
+        await updateAppointmentStatus(refundingId, 'cancelled');
+        
+        // Criar notificação
+        await supabase
+          .from('notifications' as any)
+          .insert({
+            tenant_id: appointment.tenant_id,
+            type: 'refund_processed',
+            title: 'Estorno Processado',
+            message: `Estorno de R$ ${((appointment as any).prepaid_amount || 0).toFixed(2)} processado para o agendamento de ${appointment.cliente_nome}. Motivo: ${refundReason || 'Não informado'}`,
+            appointment_id: refundingId,
+            read: false,
+          });
+
+        toast.success('Estorno processado com sucesso!');
+        setRefundDialogOpen(false);
+        setRefundingId(null);
+        setRefundReason('');
+        refetch();
+      } else {
+        toast.error(result.error || 'Erro ao processar estorno');
+      }
+    } catch (error: any) {
+      console.error('Erro ao processar estorno:', error);
+      toast.error('Erro ao processar estorno. Tente novamente.');
+    } finally {
+      setProcessingRefund(false);
+    }
   };
 
   const confirmCancel = async () => {
@@ -315,6 +406,33 @@ const AdminAgenda = () => {
                                       Confirmar
                                     </DropdownMenuItem>
                                   )}
+                                  {(() => {
+                                    // Debug: verificar condições
+                                    const hasPixPayment = !!appointment.pix_payment_id;
+                                    const isConfirmed = appointment.status === 'confirmed';
+                                    const notRefunded = !appointment.refunded;
+                                    const shouldShow = isConfirmed && hasPixPayment && notRefunded;
+                                    
+                                    // Log para debug (remover depois)
+                                    if (isConfirmed) {
+                                      console.log('🔍 Agendamento confirmado:', {
+                                        id: appointment.id,
+                                        cliente: appointment.cliente_nome,
+                                        status: appointment.status,
+                                        hasPixPayment,
+                                        pix_payment_id: appointment.pix_payment_id,
+                                        refunded: appointment.refunded,
+                                        shouldShow,
+                                      });
+                                    }
+                                    
+                                    return shouldShow ? (
+                                      <DropdownMenuItem onClick={() => handleRefund(appointment.id)}>
+                                        <RotateCcw className="w-4 h-4 mr-2 text-amber-600" />
+                                        Estornar Pagamento
+                                      </DropdownMenuItem>
+                                    ) : null;
+                                  })()}
                                   <DropdownMenuItem onClick={() => handleCancel(appointment.id)}>
                                     <X className="w-4 h-4 mr-2 text-destructive" />
                                     Cancelar
@@ -356,6 +474,58 @@ const AdminAgenda = () => {
         confirmText="Cancelar Agendamento"
         variant="destructive"
       />
+
+      {/* Dialog de Estorno */}
+      <Dialog open={refundDialogOpen} onOpenChange={setRefundDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Estornar Pagamento PIX</DialogTitle>
+            <DialogDescription>
+              O estorno será processado e o valor será devolvido ao cliente. Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="refund-reason">Motivo do estorno *</Label>
+              <Textarea
+                id="refund-reason"
+                placeholder="Ex: Cliente cancelou o agendamento, erro no pagamento, etc."
+                value={refundReason}
+                onChange={(e) => setRefundReason(e.target.value)}
+                className="mt-2"
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRefundDialogOpen(false);
+                setRefundReason('');
+                setRefundingId(null);
+              }}
+              disabled={processingRefund}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmRefund}
+              disabled={processingRefund || !refundReason.trim()}
+            >
+              {processingRefund ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Processando...
+                </>
+              ) : (
+                'Confirmar Estorno'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 };

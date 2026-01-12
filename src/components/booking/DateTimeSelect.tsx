@@ -36,6 +36,8 @@ interface DateBlock {
 interface Appointment {
   data_hora: string;
   service_duration: number;
+  status?: string;
+  tolerance_expires_at?: string | null;
 }
 
 interface DateTimeSelectProps {
@@ -95,10 +97,13 @@ export function DateTimeSelect({
           .filter(bh => bh.is_open)
           .map(bh => bh.day_of_week);
       }
-      return professionalSchedule.workDays || [1, 2, 3, 4, 5, 6];
+      // If workDays is defined and not empty, use it
+      if (professionalSchedule.workDays && professionalSchedule.workDays.length > 0) {
+        return professionalSchedule.workDays;
+      }
     }
     
-    // Default: Mon-Sat
+    // Default: Mon-Sat (if no schedule or empty workDays)
     return [1, 2, 3, 4, 5, 6];
   };
 
@@ -226,9 +231,50 @@ export function DateTimeSelect({
     };
     
     // Filter appointments for this date
+    // Excluir agendamentos expirados (pending_payment com tolerance_expires_at no passado)
+    const now = new Date();
     const appointmentsForDay = appointments.filter(apt => {
       const aptDate = new Date(apt.data_hora);
-      return format(aptDate, 'yyyy-MM-dd') === dateStr;
+      const isSameDate = format(aptDate, 'yyyy-MM-dd') === dateStr;
+      
+      if (!isSameDate) return false;
+      
+      // Se for agendamento pending_payment, verificar se não expirou
+      const aptStatus = (apt as any).status;
+      const aptToleranceExpiresAt = (apt as any).tolerance_expires_at;
+      
+      if (aptStatus === 'pending_payment') {
+        if (aptToleranceExpiresAt) {
+          const expiresAt = new Date(aptToleranceExpiresAt);
+          const isValid = now <= expiresAt;
+          
+          if (!isValid) {
+            console.log('⏰ Agendamento pending_payment expirado, não bloqueando horário:', {
+              data_hora: apt.data_hora,
+              expiresAt: expiresAt.toISOString(),
+              now: now.toISOString(),
+            });
+            return false; // Agendamento expirado, não bloquear horário
+          }
+          
+          console.log('🔒 Agendamento pending_payment válido, bloqueando horário:', {
+            data_hora: apt.data_hora,
+            expiresAt: expiresAt.toISOString(),
+            now: now.toISOString(),
+          });
+        } else {
+          // Se não tem tolerance_expires_at, considerar como válido (não deve acontecer, mas por segurança)
+          console.warn('⚠️ Agendamento pending_payment sem tolerance_expires_at:', apt.data_hora);
+        }
+      }
+      
+      return true; // Incluir agendamento (confirmed, pending, ou pending_payment válido)
+    });
+    
+    console.log('📅 Agendamentos para o dia', dateStr, ':', {
+      total: appointments.length,
+      filtrados: appointmentsForDay.length,
+      pending_payment: appointmentsForDay.filter((a: any) => (a as any).status === 'pending_payment').length,
     });
     
     return slots.filter(slot => {

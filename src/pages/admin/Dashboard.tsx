@@ -9,7 +9,9 @@ import {
   Calendar,
   Clock,
   Loader2,
+  User,
 } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAppointments } from '@/hooks/useAppointments';
 import { useServices } from '@/hooks/useServices';
 import { useProfessionals } from '@/hooks/useProfessionals';
@@ -261,11 +263,14 @@ const AdminDashboard = () => {
                     {professionals.filter(p => p.ativo).slice(0, 4).map((prof) => (
                       <div
                         key={prof.id}
-                        className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-lg bg-secondary/50"
+                        className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 rounded-lg bg-secondary/50 hover:bg-secondary transition-colors"
                       >
-                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                          <Users className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
-                        </div>
+                        <Avatar className="w-8 h-8 sm:w-10 sm:h-10 shrink-0">
+                          <AvatarImage src={prof.avatar_url || undefined} alt={prof.nome} />
+                          <AvatarFallback className="bg-primary/20 text-primary">
+                            <User className="w-4 h-4 sm:w-5 sm:h-5" />
+                          </AvatarFallback>
+                        </Avatar>
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-foreground text-xs sm:text-sm truncate">{prof.nome}</p>
                           <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{prof.especialidade || 'Profissional'}</p>

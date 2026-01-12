@@ -8,7 +8,15 @@ import { VitePWA } from "vite-plugin-pwa";
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
-    port: 8080,
+    port: 8081,
+    proxy: {
+      '/api/whatsapp': {
+        target: 'https://weeb.inoovaweb.com.br',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/whatsapp/, ''),
+        secure: true,
+      },
+    },
   },
   plugins: [
     react(),

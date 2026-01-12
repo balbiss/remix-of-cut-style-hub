@@ -129,7 +129,7 @@ export function SuccessScreen({
             >
               <Star className="w-5 h-5 text-gold" />
               <span className="text-sm font-medium text-foreground">
-                +{earnedPoints} pontos ganhos neste agendamento
+                +{earnedPoints} pontos serão creditados após o atendimento
               </span>
             </motion.div>
           )}

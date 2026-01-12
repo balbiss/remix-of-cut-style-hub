@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/admin/ProtectedRoute";
 import { SuperAdminRoute } from "@/components/super-admin/SuperAdminRoute";
 import { BarberRoute } from "@/components/barber/BarberRoute";
+import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import Index from "./pages/Index";
 import Booking from "./pages/Booking";
 import Auth from "./pages/Auth";
@@ -22,6 +23,7 @@ import AdminRelatorios from "./pages/admin/Relatorios";
 import SuperAdminDashboard from "./pages/super-admin/Dashboard";
 import SuperAdminTenants from "./pages/super-admin/Tenants";
 import BarberDashboard from "./pages/barber/Dashboard";
+import MeusPontos from "./pages/MeusPontos";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -33,12 +35,15 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <PWAInstallPrompt />
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/b/:slug" element={<Booking />} />
             <Route path="/agendar/:slug" element={<Booking />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/pontos/:slug" element={<MeusPontos />} />
+            <Route path="/meus-pontos/:slug" element={<MeusPontos />} />
             <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
             <Route path="/admin/agenda" element={<ProtectedRoute><AdminAgenda /></ProtectedRoute>} />
             <Route path="/admin/profissionais" element={<ProtectedRoute><AdminProfissionais /></ProtectedRoute>} />

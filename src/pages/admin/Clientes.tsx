@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, Phone, Star, Search, UserPlus, Gift, Loader2 } from 'lucide-react';
+import { Users, Phone, Star, Search, UserPlus, Gift, Loader2, Shield } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useResponsive } from '@/hooks/use-responsive';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   Table,
   TableBody,
@@ -27,9 +30,11 @@ import { useClients, ClientWithPoints } from '@/hooks/useClients';
 import { useLoyaltyRewards } from '@/hooks/useLoyaltyRewards';
 import { useLoyaltyConfig } from '@/hooks/useLoyaltyConfig';
 import { RedeemRewardDialog } from '@/components/admin/RedeemRewardDialog';
+import { ValidateRedemptionDialog } from '@/components/barber/ValidateRedemptionDialog';
 
 const AdminClientes = () => {
   const { isDesktop } = useResponsive();
+  const { tenant } = useAuth();
   const { clients, isLoading, addClient, redeemPoints } = useClients();
   const { activeRewards } = useLoyaltyRewards();
   const { config: loyaltyConfig } = useLoyaltyConfig();
@@ -38,6 +43,9 @@ const AdminClientes = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isRedeemDialogOpen, setIsRedeemDialogOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<ClientWithPoints | null>(null);
+  const [pendingRedemptions, setPendingRedemptions] = useState<any[]>([]);
+  const [redemptionDialogOpen, setRedemptionDialogOpen] = useState(false);
+  const [selectedRedemption, setSelectedRedemption] = useState<any | null>(null);
   
   // New client form
   const [newClientName, setNewClientName] = useState('');
@@ -87,6 +95,60 @@ const AdminClientes = () => {
     if (numbers.length <= 2) return `(${numbers}`;
     if (numbers.length <= 7) return `(${numbers.slice(0, 2)}) ${numbers.slice(2)}`;
     return `(${numbers.slice(0, 2)}) ${numbers.slice(2, 7)}-${numbers.slice(7, 11)}`;
+  };
+
+  // Buscar resgates pendentes
+  useEffect(() => {
+    fetchPendingRedemptions();
+  }, [tenant?.id]);
+
+  const fetchPendingRedemptions = async () => {
+    if (!tenant?.id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('loyalty_redemptions')
+        .select(`
+          id,
+          validation_code,
+          points_spent,
+          expires_at,
+          created_at,
+          clients:client_id (id, nome, telefone),
+          loyalty_rewards:reward_id (id, nome, reward_type, reward_value)
+        `)
+        .eq('tenant_id', tenant.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching pending redemptions:', error);
+        return;
+      }
+
+      const mapped = (data || []).map((red: any) => ({
+        id: red.id,
+        validation_code: red.validation_code,
+        points_spent: red.points_spent,
+        expires_at: red.expires_at,
+        created_at: red.created_at,
+        client: red.clients,
+        reward: red.loyalty_rewards,
+      }));
+
+      setPendingRedemptions(mapped);
+    } catch (error) {
+      console.error('Error fetching pending redemptions:', error);
+    }
+  };
+
+  const openRedemptionDialog = (redemption: any) => {
+    setSelectedRedemption(redemption);
+    setRedemptionDialogOpen(true);
+  };
+
+  const handleRedemptionSuccess = () => {
+    fetchPendingRedemptions();
   };
 
   return (
@@ -166,6 +228,69 @@ const AdminClientes = () => {
               </Button>
             </CardContent>
           </Card>
+        )}
+
+        {/* Resgates Pendentes */}
+        {pendingRedemptions.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+          >
+            <Card variant="elevated" className="border-gold/20 bg-gold/5">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center">
+                      <Shield className="w-5 h-5 text-gold" />
+                    </div>
+                    <div>
+                      <CardTitle>Resgates Pendentes</CardTitle>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Clientes aguardando validação de código
+                      </p>
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="bg-gold/10 text-gold border-gold/30">
+                    {pendingRedemptions.length}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {pendingRedemptions.map((redemption) => (
+                    <div
+                      key={redemption.id}
+                      className="flex items-center justify-between p-4 rounded-lg bg-secondary/30 border border-gold/10 hover:bg-secondary/50 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-foreground truncate">
+                          {redemption.client?.nome || 'Cliente'}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {redemption.reward?.nome} • {redemption.points_spent} pontos
+                        </p>
+                        {redemption.validation_code && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Código: <span className="font-mono font-semibold">{redemption.validation_code}</span>
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="gold"
+                        onClick={() => openRedemptionDialog(redemption)}
+                        className="ml-2 shrink-0"
+                      >
+                        <Shield className="w-4 h-4 mr-1" />
+                        Validar
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
         )}
 
         {/* Clients List/Table */}
@@ -363,6 +488,14 @@ const AdminClientes = () => {
         onOpenChange={setIsRedeemDialogOpen}
         client={selectedClient}
         onRedeem={handleRedeem}
+      />
+
+      {/* Validate Redemption Dialog */}
+      <ValidateRedemptionDialog
+        open={redemptionDialogOpen}
+        onOpenChange={setRedemptionDialogOpen}
+        redemption={selectedRedemption}
+        onSuccess={handleRedemptionSuccess}
       />
     </AdminLayout>
   );

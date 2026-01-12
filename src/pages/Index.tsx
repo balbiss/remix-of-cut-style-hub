@@ -10,7 +10,8 @@ import { PaymentStep } from '@/components/booking/PaymentStep';
 import { SuccessScreen } from '@/components/booking/SuccessScreen';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { ChevronLeft, Sparkles, Loader2 } from 'lucide-react';
+import { ChevronLeft, Sparkles, Loader2, Star } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const stepLabels = [
   'Profissional',
@@ -52,6 +53,7 @@ interface Tenant {
   id: string;
   nome: string;
   logo_url: string | null;
+  slug?: string;
 }
 
 interface LoyaltyConfig {
@@ -331,12 +333,13 @@ const Index = () => {
 
       if (appointmentError) throw appointmentError;
 
-      // Calculate and add loyalty points
+      // Calcular pontos que serão ganhos (mas NÃO lançar ainda)
+      // Os pontos serão lançados automaticamente quando o barbeiro marcar como concluído
       const pointsToAdd = calculatePoints();
       setEarnedPoints(pointsToAdd);
 
+      // Buscar pontos atuais do cliente para exibir na tela de sucesso
       if (pointsToAdd > 0) {
-        // Check if client already has points
         const { data: existingPoints } = await supabase
           .from('loyalty_points')
           .select('*')
@@ -345,31 +348,12 @@ const Index = () => {
           .maybeSingle();
 
         if (existingPoints) {
-          const newTotal = (existingPoints.pontos || 0) + pointsToAdd;
-          setTotalPoints(newTotal);
-
-          await supabase
-            .from('loyalty_points')
-            .update({
-              pontos: newTotal,
-              total_earned: ((existingPoints as any).total_earned || 0) + pointsToAdd,
-            })
-            .eq('id', existingPoints.id);
+          setTotalPoints(existingPoints.pontos || 0);
         } else {
-          setTotalPoints(pointsToAdd);
-
-          await supabase
-            .from('loyalty_points')
-            .insert({
-              tenant_id: tenant.id,
-              cliente_zap: clientPhone,
-              pontos: pointsToAdd,
-              total_earned: pointsToAdd,
-              total_redeemed: 0,
-            });
+          setTotalPoints(0);
         }
 
-        // Also ensure client exists in clients table
+        // Garantir que o cliente existe na tabela clients
         const { data: existingClient } = await supabase
           .from('clients')
           .select('id')
@@ -384,6 +368,16 @@ const Index = () => {
             telefone: clientPhone,
           });
         }
+      } else {
+        // Buscar pontos atuais mesmo sem ganhar novos
+        const { data: existingPoints } = await supabase
+          .from('loyalty_points')
+          .select('*')
+          .eq('tenant_id', tenant.id)
+          .eq('cliente_zap', clientPhone)
+          .maybeSingle();
+
+        setTotalPoints(existingPoints?.pontos || 0);
       }
 
       setIsSuccess(true);
@@ -467,16 +461,30 @@ const Index = () => {
               <p className="text-muted-foreground text-lg mb-8">
                 Agende seu horário em segundos e chegue no estilo que você merece.
               </p>
-              <Button
-                variant="gold"
-                size="xl"
-                onClick={() => setShowWizard(true)}
-                className="w-full max-w-xs animate-glow"
-                disabled={professionals.length === 0 || services.length === 0}
-              >
-                <Sparkles className="w-5 h-5 mr-2" />
-                Agendar Agora
-              </Button>
+              <div className="space-y-3 w-full max-w-xs">
+                <Button
+                  variant="gold"
+                  size="xl"
+                  onClick={() => setShowWizard(true)}
+                  className="w-full animate-glow"
+                  disabled={professionals.length === 0 || services.length === 0}
+                >
+                  <Sparkles className="w-5 h-5 mr-2" />
+                  Agendar Agora
+                </Button>
+                {loyaltyConfig?.enabled && (
+                  <Link to={tenant?.slug ? `/pontos/${tenant.slug}` : '/meus-pontos'}>
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      className="w-full"
+                    >
+                      <Star className="w-4 h-4 mr-2" />
+                      Ver Meus Pontos
+                    </Button>
+                  </Link>
+                )}
+              </div>
               {(professionals.length === 0 || services.length === 0) && (
                 <p className="text-sm text-muted-foreground mt-4">
                   Em breve disponível para agendamentos

@@ -10,6 +10,9 @@ import { BusinessHoursForm } from '@/components/admin/BusinessHoursForm';
 import { DateBlockForm } from '@/components/admin/DateBlockForm';
 import { LoyaltyConfigForm } from '@/components/admin/LoyaltyConfigForm';
 import { LoyaltyRewardsForm } from '@/components/admin/LoyaltyRewardsForm';
+import { ConnectWhatsAppDialog } from '@/components/admin/ConnectWhatsAppDialog';
+import { ManageWhatsAppDialog } from '@/components/admin/ManageWhatsAppDialog';
+import { BookingPageForm } from '@/components/admin/BookingPageForm';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDateBlocks } from '@/hooks/useDateBlocks';
 import { supabase } from '@/integrations/supabase/client';
@@ -31,8 +34,12 @@ import {
   ExternalLink,
   Download,
   QrCode,
+  CheckCircle,
+  AlertCircle,
+  Smartphone,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { getUserInfo, getUserAvatar } from '@/lib/whatsapp-api';
 
 const AdminSettings = () => {
   const { toast } = useToast();
@@ -43,11 +50,17 @@ const AdminSettings = () => {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [businessName, setBusinessName] = useState(tenant?.nome || '');
   const [businessSlug, setBusinessSlug] = useState(tenant?.slug || '');
-  const [evolutionUrl, setEvolutionUrl] = useState('');
-  const [evolutionToken, setEvolutionToken] = useState('');
   const [mpPublicKey, setMpPublicKey] = useState('');
+  const [mpAccessToken, setMpAccessToken] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [whatsappDialogOpen, setWhatsappDialogOpen] = useState(false);
+  const [manageDialogOpen, setManageDialogOpen] = useState(false);
+  const [connection, setConnection] = useState<any>(null);
+  const [loadingConnection, setLoadingConnection] = useState(true);
+  const [whatsappUserInfo, setWhatsappUserInfo] = useState<any>(null);
+  const [whatsappAvatar, setWhatsappAvatar] = useState<string | null>(null);
+  const [loadingWhatsappInfo, setLoadingWhatsappInfo] = useState(false);
 
   // Update local state when tenant changes
   useEffect(() => {
@@ -55,12 +68,120 @@ const AdminSettings = () => {
       setLogoPreview(tenant.logo_url || null);
       setBusinessName(tenant.nome || '');
       setBusinessSlug(tenant.slug || '');
+      setMpPublicKey(tenant.mp_public_key || '');
+      setMpAccessToken((tenant as any).mp_access_token || '');
+      loadConnection();
     }
   }, [tenant]);
+
+  // Load WhatsApp connection
+  const loadConnection = async () => {
+    if (!tenant?.id) {
+      setLoadingConnection(false);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('connections')
+        .select('*')
+        .eq('tenant_id', tenant.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      setConnection(data);
+    } catch (error) {
+      console.error('Error loading connection:', error);
+    } finally {
+      setLoadingConnection(false);
+    }
+  };
 
   // Schedule states - using mock-data types
   const [businessHours, setBusinessHours] = useState<BusinessHours[]>(mockBusinessHours);
   const [breakTime, setBreakTime] = useState<BreakTime>(mockBreakTime);
+  const [isLoadingHours, setIsLoadingHours] = useState(true);
+
+  // Load business hours from database
+  useEffect(() => {
+    const loadBusinessHours = async () => {
+      if (!tenant?.id) {
+        setIsLoadingHours(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('business_hours')
+          .select('*')
+          .eq('tenant_id', tenant.id)
+          .order('day_of_week');
+
+        if (error) throw error;
+
+        // Convert from database format to component format
+        const loadedHours: BusinessHours[] = [];
+        for (let day = 0; day <= 6; day++) {
+          const dbHour = data?.find((bh: any) => bh.day_of_week === day);
+          if (dbHour && dbHour.is_open) {
+            let periods: { start: string; end: string }[] = [];
+            
+            if (dbHour.periods) {
+              if (Array.isArray(dbHour.periods)) {
+                // Format: [{ start: "09:00", end: "12:00" }, ...]
+                periods = dbHour.periods.map((p: any) => ({
+                  start: p.start || '09:00',
+                  end: p.end || '12:00',
+                }));
+              } else if (typeof dbHour.periods === 'object') {
+                // Format: { morningStart, morningEnd, afternoonStart, afternoonEnd }
+                const p = dbHour.periods;
+                if (p.morningStart && p.morningEnd) {
+                  periods.push({ start: p.morningStart, end: p.morningEnd });
+                }
+                if (p.afternoonStart && p.afternoonEnd) {
+                  periods.push({ start: p.afternoonStart, end: p.afternoonEnd });
+                }
+              }
+            }
+            
+            // If no periods found, add default
+            if (periods.length === 0) {
+              periods = [{ start: '09:00', end: '12:00' }];
+            }
+            
+            loadedHours.push({
+              dayOfWeek: day,
+              isOpen: true,
+              periods: periods,
+            });
+          } else {
+            // Default closed day
+            loadedHours.push({
+              dayOfWeek: day,
+              isOpen: false,
+              periods: [{ start: '09:00', end: '12:00' }],
+            });
+          }
+        }
+
+        setBusinessHours(loadedHours);
+      } catch (error) {
+        console.error('Error loading business hours:', error);
+        toast({
+          title: 'Erro ao carregar horários',
+          description: 'Não foi possível carregar os horários salvos.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoadingHours(false);
+      }
+    };
+
+    loadBusinessHours();
+  }, [tenant?.id]);
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -85,14 +206,160 @@ const AdminSettings = () => {
   };
 
   const handleSaveIntegrations = async () => {
+    if (!tenant) return;
+
     setIsSaving(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setIsSaving(false);
-    toast({
-      title: 'Configurações salvas!',
-      description: 'Suas integrações foram atualizadas com sucesso.',
-    });
+    try {
+      const { error } = await supabase
+        .from('tenants')
+        .update({
+          mp_public_key: mpPublicKey || null,
+          mp_access_token: mpAccessToken || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', tenant.id);
+
+      if (error) throw error;
+
+      await refreshTenant();
+
+      toast({
+        title: 'Configurações salvas!',
+        description: 'Suas integrações foram atualizadas com sucesso.',
+      });
+    } catch (error: any) {
+      console.error('Error saving integrations:', error);
+      toast({
+        title: 'Erro ao salvar',
+        description: error.message || 'Não foi possível salvar as configurações.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
+
+  const handleWhatsAppSuccess = async () => {
+    // Refresh tenant data and connection after WhatsApp connection
+    await refreshTenant();
+    // Aguardar um pouco para garantir que o banco foi atualizado
+    setTimeout(async () => {
+      await loadConnection();
+      // Forçar recarregamento das informações do WhatsApp após carregar a conexão
+      setTimeout(() => {
+        // O useEffect vai detectar a mudança de status e buscar as informações
+      }, 500);
+    }, 1000);
+  };
+
+  // Verificar status quando a conexão é carregada e está como "connecting"
+  // Não verificar automaticamente para 'offline' - deixar o usuário gerenciar manualmente
+  useEffect(() => {
+    if (!connection?.id || connection.status !== 'connecting') return;
+
+    const interval = setInterval(async () => {
+      try {
+        const { data: updatedConnection, error } = await supabase
+          .from('connections')
+          .select('*')
+          .eq('id', connection.id)
+          .single();
+
+        if (!error && updatedConnection) {
+          setConnection(updatedConnection);
+          
+          // Se mudou para online ou offline, parar de verificar
+          if (updatedConnection.status !== 'connecting') {
+            clearInterval(interval);
+            // Recarregar tenant também
+            refreshTenant();
+          }
+        }
+      } catch (error) {
+        console.error('Error checking connection status:', error);
+      }
+    }, 5000); // Verificar a cada 5 segundos
+
+    return () => clearInterval(interval);
+  }, [connection?.id, connection?.status, tenant?.id]);
+
+  // Buscar informações do WhatsApp quando conectado
+  useEffect(() => {
+    const loadWhatsappInfo = async () => {
+      if (!connection?.api_instance_token || connection?.status !== 'online') {
+        console.log('🔍 WhatsApp info: Não buscando - status:', connection?.status, 'token:', !!connection?.api_instance_token);
+        setWhatsappUserInfo(null);
+        setWhatsappAvatar(null);
+        return;
+      }
+
+      console.log('🔍 WhatsApp info: Iniciando busca de informações...', {
+        hasToken: !!connection.api_instance_token,
+        status: connection.status,
+        phoneNumber: connection.phone_number,
+      });
+
+      setLoadingWhatsappInfo(true);
+      try {
+        // Buscar informações do usuário
+        console.log('📞 Buscando informações do usuário...');
+        const userInfoResult = await getUserInfo(connection.api_instance_token);
+        console.log('📞 Resultado getUserInfo:', userInfoResult);
+        
+        if (userInfoResult.success && userInfoResult.data) {
+          setWhatsappUserInfo(userInfoResult.data);
+          console.log('✅ Informações do usuário carregadas:', userInfoResult.data);
+          
+          // Determinar número de telefone para buscar avatar
+          let phoneNumberToUse: string | null = null;
+          
+          // Prioridade 1: JID do usuário
+          if (userInfoResult.data.jid) {
+            // JID formato: 5491155551122:12@s.whatsapp.net ou 5491155551122@s.whatsapp.net
+            const phoneMatch = userInfoResult.data.jid.match(/^(\d+)[:@]/);
+            if (phoneMatch && phoneMatch[1]) {
+              phoneNumberToUse = phoneMatch[1];
+              console.log('📱 Número extraído do JID:', phoneNumberToUse);
+            }
+          }
+          
+          // Prioridade 2: phone_number da conexão
+          if (!phoneNumberToUse && connection.phone_number) {
+            phoneNumberToUse = connection.phone_number.replace(/\D/g, '');
+            console.log('📱 Usando número da conexão:', phoneNumberToUse);
+          }
+          
+          // Buscar avatar se tiver número
+          if (phoneNumberToUse) {
+            console.log('🖼️ Buscando avatar para:', phoneNumberToUse);
+            const avatarResult = await getUserAvatar(
+              connection.api_instance_token,
+              phoneNumberToUse,
+              true // preview
+            );
+            console.log('🖼️ Resultado getUserAvatar:', avatarResult);
+            
+            if (avatarResult.success && avatarResult.url) {
+              setWhatsappAvatar(avatarResult.url);
+              console.log('✅ Avatar carregado:', avatarResult.url);
+            } else {
+              console.warn('⚠️ Não foi possível carregar avatar:', avatarResult.error);
+            }
+          } else {
+            console.warn('⚠️ Nenhum número de telefone disponível para buscar avatar');
+          }
+        } else {
+          console.error('❌ Erro ao buscar informações do usuário:', userInfoResult.error);
+        }
+      } catch (error) {
+        console.error('❌ Error loading WhatsApp info:', error);
+      } finally {
+        setLoadingWhatsappInfo(false);
+      }
+    };
+
+    loadWhatsappInfo();
+  }, [connection?.api_instance_token, connection?.status, connection?.phone_number]);
 
   const handleSaveAppearance = async () => {
     if (!tenant) return;
@@ -156,13 +423,72 @@ const AdminSettings = () => {
   };
 
   const handleSaveSchedule = async () => {
+    if (!tenant?.id) {
+      toast({
+        title: 'Erro',
+        description: 'Tenant não encontrado.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsSaving(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setIsSaving(false);
-    toast({
-      title: 'Horários salvos!',
-      description: 'Os horários de funcionamento foram atualizados.',
-    });
+    try {
+      // Save each day's business hours
+      for (const day of businessHours) {
+        const periods = day.isOpen && day.periods.length > 0 
+          ? day.periods.map(p => ({ start: p.start, end: p.end }))
+          : null;
+
+        // Check if record exists
+        const { data: existing } = await supabase
+          .from('business_hours')
+          .select('id')
+          .eq('tenant_id', tenant.id)
+          .eq('day_of_week', day.dayOfWeek)
+          .maybeSingle();
+
+        if (existing) {
+          // Update existing record
+          const { error } = await supabase
+            .from('business_hours')
+            .update({
+              is_open: day.isOpen,
+              periods: periods,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existing.id);
+
+          if (error) throw error;
+        } else {
+          // Insert new record
+          const { error } = await supabase
+            .from('business_hours')
+            .insert({
+              tenant_id: tenant.id,
+              day_of_week: day.dayOfWeek,
+              is_open: day.isOpen,
+              periods: periods,
+            });
+
+          if (error) throw error;
+        }
+      }
+
+      toast({
+        title: 'Horários salvos!',
+        description: 'Os horários de funcionamento foram atualizados com sucesso.',
+      });
+    } catch (error: any) {
+      console.error('Error saving business hours:', error);
+      toast({
+        title: 'Erro ao salvar',
+        description: error.message || 'Não foi possível salvar os horários. Tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleAddDateBlock = async (block: Omit<DateBlock, 'id'>) => {
@@ -235,21 +561,33 @@ const AdminSettings = () => {
               <Palette className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1 sm:mr-2 shrink-0" />
               <span className="truncate">Aparência</span>
             </TabsTrigger>
+            <TabsTrigger
+              value="booking-page"
+              className="flex-1 min-w-0 text-xs sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+            >
+              <Smartphone className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1 sm:mr-2 shrink-0" />
+              <span className="truncate">Página</span>
+            </TabsTrigger>
           </TabsList>
 
           {/* Schedule Tab */}
           <TabsContent value="schedule" className="space-y-6">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="space-y-6"
-            >
-              <BusinessHoursForm
-                businessHours={businessHours}
-                breakTime={breakTime}
-                onBusinessHoursChange={setBusinessHours}
-                onBreakTimeChange={setBreakTime}
-              />
+            {isLoadingHours ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-6"
+              >
+                <BusinessHoursForm
+                  businessHours={businessHours}
+                  breakTime={breakTime}
+                  onBusinessHoursChange={setBusinessHours}
+                  onBreakTimeChange={setBreakTime}
+                />
 
               <DateBlockForm
                 dateBlocks={convertedDateBlocks}
@@ -257,29 +595,28 @@ const AdminSettings = () => {
                 onRemoveBlock={handleRemoveDateBlock}
               />
 
-              <div className="flex justify-end pt-4">
-                <Button
-                  variant="gold"
-                  size="lg"
-                  onClick={handleSaveSchedule}
-                  disabled={isSaving}
-                >
-                  {isSaving ? (
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                    >
-                      <Save className="w-5 h-5" />
-                    </motion.div>
-                  ) : (
-                    <>
-                      <Check className="w-5 h-5 mr-2" />
-                      Salvar Horários
-                    </>
-                  )}
-                </Button>
-              </div>
-            </motion.div>
+                <div className="flex justify-end pt-4">
+                  <Button
+                    variant="gold"
+                    size="lg"
+                    onClick={handleSaveSchedule}
+                    disabled={isSaving}
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                        Salvando...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-5 h-5 mr-2" />
+                        Salvar Horários
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </motion.div>
+            )}
           </TabsContent>
 
           {/* Loyalty Tab */}
@@ -300,44 +637,123 @@ const AdminSettings = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
             >
-              {/* Evolution API */}
+              {/* WhatsApp Integration */}
               <Card variant="elevated" className="mb-6">
                 <CardHeader>
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                      <MessageSquare className="w-6 h-6 text-emerald-500" />
-                    </div>
-                    <div>
-                      <CardTitle>Evolution API</CardTitle>
-                      <CardDescription>
-                        Integração para envio de mensagens via WhatsApp
-                      </CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                        <MessageSquare className="w-6 h-6 text-emerald-500" />
+                      </div>
+                      <div>
+                        <CardTitle>WhatsApp</CardTitle>
+                        <CardDescription>
+                          Conecte seu WhatsApp para enviar mensagens automáticas
+                        </CardDescription>
+                      </div>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-muted-foreground">
-                      URL da API
-                    </label>
-                    <Input
-                      type="url"
-                      placeholder="https://sua-evolution-api.com"
-                      value={evolutionUrl}
-                      onChange={(e) => setEvolutionUrl(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-muted-foreground">
-                      Token de Acesso
-                    </label>
-                    <Input
-                      type="password"
-                      placeholder="••••••••••••••••"
-                      value={evolutionToken}
-                      onChange={(e) => setEvolutionToken(e.target.value)}
-                    />
-                  </div>
+                  {loadingConnection ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                    </div>
+                  ) : connection ? (
+                    <div className="space-y-3">
+                      <div className={`flex items-center gap-3 p-3 rounded-lg border ${
+                        connection.status === 'online' 
+                          ? 'bg-emerald-500/10 border-emerald-500/20' 
+                          : connection.status === 'connecting'
+                          ? 'bg-amber-500/10 border-amber-500/20'
+                          : 'bg-muted border-border'
+                      }`}>
+                        {connection.status === 'online' && whatsappAvatar ? (
+                          <div className="relative">
+                            <img 
+                              src={whatsappAvatar} 
+                              alt="WhatsApp Profile" 
+                              className="w-12 h-12 rounded-full object-cover border-2 border-emerald-500/20"
+                              onError={(e) => {
+                                // Fallback para ícone se a imagem falhar
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                            <CheckCircle className="w-4 h-4 text-emerald-500 absolute -bottom-0 -right-0 bg-background rounded-full" />
+                          </div>
+                        ) : connection.status === 'online' ? (
+                          <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center border-2 border-emerald-500/20">
+                            <CheckCircle className="w-6 h-6 text-emerald-500" />
+                          </div>
+                        ) : connection.status === 'connecting' ? (
+                          <Loader2 className="w-5 h-5 animate-spin text-amber-500" />
+                        ) : (
+                          <AlertCircle className="w-5 h-5 text-muted-foreground" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium">
+                            {connection.status === 'online' ? 'WhatsApp Conectado' : 
+                             connection.status === 'connecting' ? 'Conectando...' : 
+                             'Instância Criada (Aguardando Conexão)'}
+                          </p>
+                          {connection.status === 'online' && whatsappUserInfo ? (
+                            <>
+                              {whatsappUserInfo.jid && (
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {whatsappUserInfo.jid.split('@')[0].split(':')[0]}
+                                </p>
+                              )}
+                              {whatsappUserInfo.name && (
+                                <p className="text-xs text-muted-foreground">
+                                  {whatsappUserInfo.name}
+                                </p>
+                              )}
+                            </>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              Instância: {connection.instance_name}
+                            </p>
+                          )}
+                          {connection.status === 'offline' && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Clique em "Gerenciar" para gerar QR Code ou código de pareamento
+                            </p>
+                          )}
+                          {connection.status === 'online' && connection.messages_sent > 0 && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {connection.messages_sent} mensagens enviadas
+                            </p>
+                          )}
+                        </div>
+                        {loadingWhatsappInfo && (
+                          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => setManageDialogOpen(true)}
+                          className="flex-1"
+                        >
+                          Gerenciar
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-sm text-muted-foreground">
+                        Conecte seu WhatsApp para enviar lembretes de agendamento e notificações aos seus clientes.
+                      </p>
+                      <Button
+                        variant="gold"
+                        onClick={() => setWhatsappDialogOpen(true)}
+                        className="w-full"
+                      >
+                        <MessageSquare className="w-4 h-4 mr-2" />
+                        Conectar WhatsApp
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -369,6 +785,23 @@ const AdminSettings = () => {
                     />
                     <p className="text-xs text-muted-foreground">
                       Encontre sua Public Key no painel do Mercado Pago
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Access Token <span className="text-amber-500">*</span>
+                    </label>
+                    <Input
+                      type="password"
+                      placeholder="APP_USR-XXXXXXXX-XXXX-XXXX"
+                      value={mpAccessToken}
+                      onChange={(e) => setMpAccessToken(e.target.value)}
+                      className={!mpAccessToken ? 'border-amber-500/50' : ''}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      <span className="text-amber-500 font-semibold">Obrigatório</span> para gerar pagamentos PIX. 
+                      Encontre seu Access Token no painel do Mercado Pago (credenciais de produção ou teste). 
+                      Mantenha em segredo.
                     </p>
                   </div>
                 </CardContent>
@@ -638,7 +1071,38 @@ const AdminSettings = () => {
               </div>
             </motion.div>
           </TabsContent>
+
+          {/* Booking Page Tab */}
+          <TabsContent value="booking-page" className="space-y-6">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
+            >
+              <BookingPageForm />
+            </motion.div>
+          </TabsContent>
         </Tabs>
+
+        {/* WhatsApp Connection Dialog */}
+        <ConnectWhatsAppDialog
+          open={whatsappDialogOpen}
+          onOpenChange={setWhatsappDialogOpen}
+          onSuccess={handleWhatsAppSuccess}
+        />
+
+        {/* WhatsApp Management Dialog */}
+        {connection && (
+          <ManageWhatsAppDialog
+            open={manageDialogOpen}
+            onOpenChange={setManageDialogOpen}
+            connection={connection}
+            onConnectionUpdate={async () => {
+              await loadConnection();
+              await refreshTenant();
+            }}
+          />
+        )}
       </div>
     </AdminLayout>
   );

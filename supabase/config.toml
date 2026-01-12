@@ -2,3 +2,15 @@ project_id = "itrxoadmfbynnxokigha"
 
 [functions.create-barber-user]
 verify_jwt = false
+
+[functions.create-pix-payment]
+verify_jwt = false
+
+[functions.check-pix-payment-status]
+verify_jwt = false
+
+[functions.cancel-expired-appointments]
+verify_jwt = false
+
+[functions.refund-pix-payment]
+verify_jwt = false

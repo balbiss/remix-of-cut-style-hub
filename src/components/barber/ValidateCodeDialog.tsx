@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { CheckCircle, Clock, AlertTriangle, Calendar } from 'lucide-react';
+import { awardPointsOnAppointmentCompletion } from '@/lib/loyalty-points';
 
 interface Appointment {
   id: string;
@@ -78,14 +79,21 @@ export function ValidateCodeDialog({
       .update({ status: 'completed' })
       .eq('id', appointment.id);
 
-    setLoading(false);
-
     if (error) {
+      setLoading(false);
       toast.error('Erro ao finalizar atendimento');
       return;
     }
 
-    toast.success('Atendimento finalizado com sucesso!');
+    // Lançar pontos de fidelidade automaticamente
+    const pointsResult = await awardPointsOnAppointmentCompletion(appointment.id);
+    if (pointsResult.success && pointsResult.pointsAwarded > 0) {
+      toast.success(`Atendimento finalizado! Cliente ganhou ${pointsResult.pointsAwarded} pontos.`);
+    } else {
+      toast.success('Atendimento finalizado com sucesso!');
+    }
+
+    setLoading(false);
     setCode('');
     setToleranceStatus(null);
     onOpenChange(false);

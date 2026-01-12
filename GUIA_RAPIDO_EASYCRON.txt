@@ -1,0 +1,65 @@
+═══════════════════════════════════════════════════════════════
+  CONFIGURAR EASYCRON - GUIA RÁPIDO COM SEUS DADOS
+═══════════════════════════════════════════════════════════════
+
+1. Acesse: https://www.easycron.com/
+2. Crie uma conta (Sign Up)
+3. Clique em "Add New Cron Job"
+
+═══════════════════════════════════════════════════════════════
+  PREENCHER OS CAMPOS:
+═══════════════════════════════════════════════════════════════
+
+Nome:
+Cancelar Agendamentos Expirados
+
+Cron Expression:
+*/2 * * * *
+
+URL:
+https://itrxoadmfbynnxokigha.supabase.co/functions/v1/cancel-expired-appointments
+
+Método HTTP:
+POST
+
+═══════════════════════════════════════════════════════════════
+  ADICIONAR 3 HEADERS:
+═══════════════════════════════════════════════════════════════
+
+Header 1:
+Name: Content-Type
+Value: application/json
+
+Header 2:
+Name: apikey
+Value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0cnhvYWRtZmJ5bm54b2tpZ2hhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM3MjUxMDYsImV4cCI6MjA3OTMwMTEwNn0.AmAAZjKlLXbts4Wvdhd5nfPXmoSvFpe7WvBn7nP51tA
+
+Header 3:
+Name: Authorization
+Value: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml0cnhvYWRtZmJ5bm54b2tpZ2hhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM3MjUxMDYsImV4cCI6MjA3OTMwMTEwNn0.AmAAZjKlLXbts4Wvdhd5nfPXmoSvFpe7WvBn7nP51tA
+
+═══════════════════════════════════════════════════════════════
+  BODY:
+═══════════════════════════════════════════════════════════════
+
+{}
+═══════════════════════════════════════════════════════════════
+
+✅ Marque "Enabled" (ativado)
+✅ Clique em "Save"
+
+═══════════════════════════════════════════════════════════════
+  TESTAR:
+═══════════════════════════════════════════════════════════════
+
+1. Clique no nome do cron job criado
+2. Clique em "Run Now"
+3. Veja os logs para confirmar que funcionou
+
+═══════════════════════════════════════════════════════════════
+
+
+
+
+
+
