@@ -48,16 +48,16 @@ export async function createPixPayment(
     // A API do Mercado Pago requer o Access Token (não a Public Key)
     // Mas para criar pagamentos, precisamos usar o Access Token
     // Por enquanto, vamos criar um endpoint no backend ou usar Edge Function
-    
+
     // Por enquanto, vamos simular ou usar uma abordagem diferente
     // O ideal seria ter um Access Token armazenado de forma segura
-    
+
     // Para desenvolvimento, vamos criar um QR Code PIX manualmente
     // ou usar uma Edge Function do Supabase
-    
+
     // Formato do QR Code PIX (EMV)
     const pixData = generatePixQRCode(params);
-    
+
     return {
       success: true,
       payment: {
@@ -113,6 +113,7 @@ export async function createPixPaymentViaEdgeFunction(
         headers: {
           'Content-Type': 'application/json',
           'apikey': supabaseAnonKey,
+          'Authorization': `Bearer ${supabaseAnonKey}`,
         },
         body: JSON.stringify({
           amount: params.amount,
@@ -140,9 +141,9 @@ export async function createPixPaymentViaEdgeFunction(
       } catch (e) {
         errorData = { error: `HTTP ${response.status}: ${response.statusText}` };
       }
-      
+
       console.error('❌ Error data:', errorData);
-      
+
       // Mensagens de erro mais específicas
       if (response.status === 401 || response.status === 403) {
         if (errorData.error?.includes('JWT') || errorData.error?.includes('Invalid')) {
@@ -150,17 +151,17 @@ export async function createPixPaymentViaEdgeFunction(
         }
         throw new Error('Não autorizado. Verifique as configurações do Supabase.');
       }
-      
+
       if (response.status === 404) {
         throw new Error('Edge Function não encontrada. Certifique-se de que a função create-pix-payment foi deployada no Supabase.');
       }
-      
+
       throw new Error(errorData.error || errorData.message || `Erro ao criar pagamento (${response.status})`);
     }
 
     const data = await response.json();
     console.log('✅ Payment data received:', data);
-    
+
     return {
       success: true,
       payment: data.payment,
@@ -185,7 +186,7 @@ export async function checkPixPaymentStatus(
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     // Usar VITE_SUPABASE_PUBLISHABLE_KEY (mesma variável usada no client.ts)
     const supabaseAnonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-    
+
     if (!supabaseAnonKey) {
       console.error('❌ VITE_SUPABASE_PUBLISHABLE_KEY não está definido');
       return {
@@ -227,7 +228,7 @@ export async function checkPixPaymentStatus(
       } catch (e) {
         errorData = { error: `HTTP ${response.status}: ${response.statusText}` };
       }
-      
+
       console.error('❌ Error data:', errorData);
       return {
         success: false,
@@ -237,7 +238,7 @@ export async function checkPixPaymentStatus(
 
     const data = await response.json();
     console.log('✅ Payment status received:', data);
-    
+
     return {
       success: true,
       status: data.status,
@@ -261,18 +262,18 @@ function generatePixQRCode(params: CreatePixPaymentParams): {
 } {
   // Formato EMV do PIX (simplificado para desenvolvimento)
   // Em produção, isso deve vir da API do Mercado Pago
-  
+
   const amount = params.amount.toFixed(2);
   const description = params.description.substring(0, 25);
-  
+
   // QR Code PIX EMV (formato simplificado)
   // Em produção, use a resposta real da API do Mercado Pago
   const pixString = `00020126${description}520400005303986540${amount}5802BR59${description}62070503***6304`;
-  
+
   // Para desenvolvimento, vamos retornar um QR Code base64 de exemplo
   // Em produção, isso deve vir da API do Mercado Pago
   const qrCodeBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
-  
+
   return {
     qrCode: pixString,
     qrCodeBase64: qrCodeBase64,
