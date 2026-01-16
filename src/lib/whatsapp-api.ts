@@ -754,6 +754,80 @@ export async function sendTextMessage(
 }
 
 /**
+ * Envia uma imagem (WUZAPI)
+ * @param image Pode ser uma URL ou base64 (data:image/png;base64,...)
+ */
+export async function sendImageMessage(
+  instanceName: string,
+  phoneNumber: string,
+  image: string,
+  caption: string,
+  apiToken: string
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    // Primeiro, verificar se o número tem WhatsApp
+    console.log('📤 sendImageMessage: Verificando número antes de enviar...');
+    const checkResult = await checkWhatsAppUser(apiToken, phoneNumber);
+
+    if (!checkResult.success || !checkResult.exists) {
+      return {
+        success: false,
+        error: checkResult.error || 'Número não possui WhatsApp',
+      };
+    }
+
+    let verifiedPhone = checkResult.formattedPhone || phoneNumber.replace(/\D/g, '');
+    verifiedPhone = verifiedPhone.replace(/@s\.whatsapp\.net$/, '').replace(/\D/g, '');
+
+    // Segundo a documentação média do WUZAPI: POST /chat/send/image
+    // A API prefere base64 sem o prefixo "data:image/png;base64," ou URL direta
+    let imageData = image;
+    if (image.startsWith('data:')) {
+      imageData = image.split(',')[1];
+    }
+
+    const payload = {
+      Phone: verifiedPhone,
+      Image: imageData,
+      Caption: caption,
+    };
+
+    console.log('📤 sendImageMessage: Enviando imagem com payload (cap: ' + caption.substring(0, 20) + '...)');
+
+    const response = await fetch(`${API_BASE_URL}/chat/send/image`, {
+      method: 'POST',
+      headers: {
+        'Token': apiToken,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const responseText = await response.text();
+    console.log('📤 sendImageMessage: Response status:', response.status);
+
+    if (!response.ok) {
+      console.error('❌ Erro ao enviar imagem:', responseText);
+      return {
+        success: false,
+        error: 'Erro ao enviar imagem (' + response.status + ')',
+      };
+    }
+
+    return {
+      success: true,
+      message: 'Imagem enviada com sucesso',
+    };
+  } catch (error: any) {
+    console.error('❌ Error sending image message:', error);
+    return {
+      success: false,
+      error: error.message || 'Erro ao enviar imagem',
+    };
+  }
+}
+
+/**
  * Obtém informações do usuário conectado (WUZAPI)
  * Segundo a documentação: GET /admin/users retorna lista de usuários com jid, name, connected, loggedIn
  */

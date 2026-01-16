@@ -84,6 +84,7 @@ serve(async (req) => {
     const idempotencyKey = external_reference || `pix_${tenant_id}_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
 
     // Criar pagamento PIX via API do Mercado Pago
+    console.log('🔗 [DEBUG] Requesting payment from Mercado Pago...');
     const mercadoPagoResponse = await fetch('https://api.mercadopago.com/v1/payments', {
       method: 'POST',
       headers: {
@@ -107,24 +108,29 @@ serve(async (req) => {
 
     if (!mercadoPagoResponse.ok) {
       const errorData = await mercadoPagoResponse.json().catch(() => ({}));
-      console.error('Mercado Pago API error:', errorData);
+      console.error('❌ [DEBUG] Mercado Pago API error:', JSON.stringify(errorData, null, 2));
       throw new Error(
-        errorData.message || 
-        errorData.error || 
+        errorData.message ||
+        errorData.error ||
         `Mercado Pago API error: ${mercadoPagoResponse.status}`
       );
     }
 
     const paymentData = await mercadoPagoResponse.json();
+    console.log('✅ [DEBUG] Mercado Pago response received:', {
+      id: paymentData.id,
+      status: paymentData.status,
+      has_qr_code: !!(paymentData.point_of_interaction?.transaction_data?.qr_code),
+    });
     console.log('Payment created:', paymentData.id);
 
     // Extrair QR Code do pagamento
-    const qrCode = 
+    const qrCode =
       paymentData.point_of_interaction?.transaction_data?.qr_code ||
       paymentData.point_of_interaction?.transaction_data?.qr_code_base64 ||
       null;
 
-    const qrCodeBase64 = 
+    const qrCodeBase64 =
       paymentData.point_of_interaction?.transaction_data?.qr_code_base64 ||
       paymentData.point_of_interaction?.transaction_data?.qr_code ||
       null;

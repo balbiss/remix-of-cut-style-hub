@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { QRCodeSVG } from 'qrcode.react';
 import { Loader2, Copy, Check, AlertCircle, CheckCircle } from 'lucide-react';
 import { createPixPaymentViaEdgeFunction, checkPixPaymentStatus } from '@/lib/mercado-pago';
-import { sendTextMessage } from '@/lib/whatsapp-api';
+import { sendTextMessage, sendImageMessage } from '@/lib/whatsapp-api';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -42,6 +42,7 @@ export function PixPaymentDialog({
   appointmentDateTime,
   totalPrice,
 }: PixPaymentDialogProps) {
+  console.log('📦 [DEBUG] PixPaymentDialog rendered! Open:', open);
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -56,13 +57,13 @@ export function PixPaymentDialog({
   useEffect(() => {
     if (open) {
       console.log('🔄 PixPaymentDialog: Dialog aberto, verificando se já existe PIX...');
-      
+
       // Limpar polling anterior se existir
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
       }
-      
+
       // Verificar se já existe uma reserva temporária para este horário
       checkExistingReservation();
     } else {
@@ -72,7 +73,7 @@ export function PixPaymentDialog({
         clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
       }
-      
+
       // Resetar estados quando fechar
       setQrCode(null);
       setQrCodeBase64(null);
@@ -94,7 +95,7 @@ export function PixPaymentDialog({
     }
 
     setLoading(true);
-    
+
     try {
       // Buscar reserva temporária existente para este horário
       const { data: existingReservation } = await supabase
@@ -111,13 +112,13 @@ export function PixPaymentDialog({
         // Verificar se ainda não expirou
         const expiresAt = new Date(existingReservation.tolerance_expires_at || 0);
         const now = new Date();
-        
+
         if (now <= expiresAt) {
           // Reserva ainda válida, usar PIX existente
           console.log('✅ Reserva temporária encontrada, usando PIX existente:', existingReservation.pix_payment_id);
           setTemporaryAppointmentId(existingReservation.id);
           setPaymentId(existingReservation.pix_payment_id);
-          
+
           // Buscar dados do PIX do Mercado Pago (ou recriar se necessário)
           // Por enquanto, vamos gerar novo PIX, mas você pode buscar do banco se salvar
           generatePixPayment();
@@ -128,10 +129,10 @@ export function PixPaymentDialog({
             .from('appointments')
             .update({ status: 'cancelled' })
             .eq('id', existingReservation.id);
-          
+
           // Enviar mensagem de expiração
           await sendExpirationMessage();
-          
+
           // Gerar novo PIX
           generatePixPayment();
         }
@@ -196,6 +197,7 @@ export function PixPaymentDialog({
   };
 
   const generatePixPayment = async () => {
+    console.log('⚙️ [DEBUG] generatePixPayment called');
     console.log('🔄 generatePixPayment: Iniciando...', { amount, description, tenantId });
     setLoading(true);
     setPaymentStatus('pending');
@@ -211,24 +213,24 @@ export function PixPaymentDialog({
         },
         tenantId
       );
-      
+
       console.log('🔄 generatePixPayment: Resultado recebido:', result);
 
       if (result.success && result.payment) {
         console.log('✅ generatePixPayment: PIX gerado com sucesso!', result.payment);
-        
+
         // Verificar se realmente temos dados do PIX
         if (!result.payment.id) {
           throw new Error('ID do pagamento não encontrado na resposta');
         }
-        
+
         // Separar código PIX copy-paste e imagem base64
-        const pixCopyPasteCode = 
+        const pixCopyPasteCode =
           result.payment.qr_code ||
           result.payment.point_of_interaction?.transaction_data?.qr_code ||
           null;
 
-        const qrCodeImageBase64 = 
+        const qrCodeImageBase64 =
           result.payment.qr_code_base64 ||
           result.payment.point_of_interaction?.transaction_data?.qr_code_base64 ||
           null;
@@ -237,8 +239,8 @@ export function PixPaymentDialog({
         if (qrCodeImageBase64) {
           // Se já está com prefixo data:image, usar direto
           // Se não, adicionar prefixo
-          const base64Image = qrCodeImageBase64.startsWith('data:image') 
-            ? qrCodeImageBase64 
+          const base64Image = qrCodeImageBase64.startsWith('data:image')
+            ? qrCodeImageBase64
             : `data:image/png;base64,${qrCodeImageBase64}`;
           setQrCodeBase64(base64Image);
           // Também salvar o código copy-paste se disponível
@@ -246,7 +248,7 @@ export function PixPaymentDialog({
             setQrCode(pixCopyPasteCode);
           }
           setPaymentId(result.payment.id);
-        } 
+        }
         // Se não temos imagem, mas temos código copy-paste, gerar QR Code
         else if (pixCopyPasteCode) {
           // Verificar se o código não é muito longo para QR Code
@@ -265,13 +267,13 @@ export function PixPaymentDialog({
         // O Supabase armazena em UTC, então está tudo correto
         if (professionalId && serviceId && appointmentDateTime) {
           const toleranceExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos a partir de agora (horário local do navegador)
-          
+
           // Log para debug (mostrar horário de Brasília)
           const nowBRT = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
           const expiresAtBRT = toleranceExpiresAt.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
           console.log(`🕐 Horário atual (Brasília): ${nowBRT}`);
           console.log(`⏰ Expira em (Brasília): ${expiresAtBRT} (15 minutos)`);
-          
+
           const { data: tempAppointment, error: tempError } = await supabase
             .from('appointments')
             .insert({
@@ -323,18 +325,18 @@ export function PixPaymentDialog({
     } catch (error: any) {
       console.error('❌ Erro ao gerar PIX:', error);
       console.error('❌ Stack trace:', error.stack);
-      
+
       // Mensagem de erro mais específica
       let errorMessage = error.message || 'Erro ao gerar código PIX. Tente novamente.';
-      
+
       if (error.message?.includes('JWT') || error.message?.includes('401') || error.message?.includes('Unauthorized')) {
         errorMessage = 'Edge Function não encontrada ou não autorizada. A função create-pix-payment precisa ser deployada no Supabase. Verifique o console para mais detalhes.';
       }
-      
+
       if (error.message?.includes('404') || error.message?.includes('não encontrada')) {
         errorMessage = 'Edge Function não encontrada. Certifique-se de que a função create-pix-payment foi deployada no Supabase.';
       }
-      
+
       // Não fechar o dialog em caso de erro, deixar o usuário tentar novamente
       toast.error(errorMessage);
       setPaymentStatus('pending');
@@ -355,10 +357,23 @@ export function PixPaymentDialog({
         .eq('status', 'online')
         .maybeSingle();
 
-      if (connError || !connection || !connection.api_instance_token) {
-        console.log('WhatsApp não conectado ou não encontrado para este tenant');
-        return; // Não é erro crítico, apenas não envia mensagem
+      if (connError) {
+        console.error('❌ Erro ao buscar conexão WhatsApp:', connError);
+        console.log('💡 Dica: Verifique se a tabela "connections" tem política RLS para acesso público (anon).');
+        return;
       }
+
+      if (!connection) {
+        console.warn('⚠️ Nenhuma conexão WhatsApp ativa encontrada para o tenant:', tenantId);
+        return;
+      }
+
+      if (!connection.api_instance_token) {
+        console.warn('⚠️ Conexão WhatsApp encontrada, mas falta o token da API (api_instance_token).', connection);
+        return;
+      }
+
+      console.log('✅ Conexão WhatsApp encontrada ativa:', connection.instance_name);
 
       // Buscar nome da barbearia
       const { data: tenant, error: tenantError } = await supabase
@@ -390,21 +405,34 @@ export function PixPaymentDialog({
       // Segunda mensagem: Código PIX separado (fácil de copiar) - apenas o código
       const message2 = `${pixCode}`;
 
-      // Enviar primeira mensagem
-      const result1 = await sendTextMessage(
-        connection.instance_name,
-        payerPhone,
-        message1,
-        connection.api_instance_token
-      );
+      // Enviar QR Code com a mensagem informativa (se tivermos imagem base64)
+      let result1;
+      if (qrCodeBase64) {
+        console.log('📤 Enviando QR Code como imagem...');
+        result1 = await sendImageMessage(
+          connection.instance_name,
+          payerPhone,
+          qrCodeBase64,
+          message1,
+          connection.api_instance_token
+        );
+      } else {
+        console.log('📤 Enviando apenas texto (QR Code imagem não disponível)');
+        result1 = await sendTextMessage(
+          connection.instance_name,
+          payerPhone,
+          message1,
+          connection.api_instance_token
+        );
+      }
 
       if (result1.success) {
-        console.log('✅ Mensagem 1 (informações) enviada com sucesso');
-        
+        console.log('✅ Mensagem 1 (agendamento/imagem) enviada com sucesso');
+
         // Aguardar 1 segundo antes de enviar a segunda mensagem
         await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Enviar segunda mensagem (código PIX)
+
+        // Enviar segunda mensagem (código PIX sozinho para fácil cópia)
         const result2 = await sendTextMessage(
           connection.instance_name,
           payerPhone,
@@ -449,35 +477,35 @@ export function PixPaymentDialog({
           if (tempAppt) {
             const expiresAt = new Date(tempAppt.tolerance_expires_at || 0);
             const now = new Date();
-            
+
             if (now > expiresAt && tempAppt.status === 'pending_payment') {
               // Agendamento expirado - cancelar e enviar mensagem
               console.log('⏰ Reserva expirada (15 minutos), cancelando...');
-              
+
               await supabase
                 .from('appointments')
                 .update({ status: 'cancelled' })
                 .eq('id', temporaryAppointmentId);
-              
+
               // Enviar mensagem de expiração
               await sendExpirationMessage();
-              
+
               setPaymentStatus('rejected');
               toast.error('Tempo de pagamento expirado (15 minutos). O horário foi liberado.');
-              
+
               if (pollingIntervalRef.current) {
                 clearInterval(pollingIntervalRef.current);
                 pollingIntervalRef.current = null;
               }
-              
+
               // Fechar dialog após alguns segundos
               setTimeout(() => {
                 onOpenChange(false);
               }, 3000);
-              
+
               return;
             }
-            
+
             if (tempAppt.status !== 'pending_payment') {
               // Agendamento já foi processado (confirmado ou cancelado)
               if (pollingIntervalRef.current) {
@@ -491,17 +519,17 @@ export function PixPaymentDialog({
 
         // SEGUNDO: Verificar status do pagamento no Mercado Pago
         const result = await checkPixPaymentStatus(id, tenantId);
-        
+
         if (result.success && result.status) {
           console.log('📊 Status do pagamento:', result.status);
-          
+
           if (result.status === 'approved') {
             setPaymentStatus('approved');
             if (pollingIntervalRef.current) {
               clearInterval(pollingIntervalRef.current);
               pollingIntervalRef.current = null;
             }
-            
+
             toast.success('✅ Pagamento confirmado! Seu agendamento está sendo processado...');
             // Aguardar um pouco antes de chamar o callback
             setTimeout(() => {
@@ -530,7 +558,7 @@ export function PixPaymentDialog({
     setCheckingPayment(true);
     try {
       const result = await checkPixPaymentStatus(paymentId, tenantId);
-      
+
       if (result.success && result.status === 'approved') {
         setPaymentStatus('approved');
         toast.success('✅ Pagamento confirmado! Seu agendamento está sendo processado...');
@@ -555,7 +583,7 @@ export function PixPaymentDialog({
       } else {
         // Erro na verificação
         let errorMessage = 'Não foi possível verificar o pagamento.';
-        
+
         if (result.error) {
           if (result.error.includes('authorization') || result.error.includes('Missing')) {
             errorMessage = 'Erro de conexão. Por favor, recarregue a página e tente novamente.';
@@ -567,7 +595,7 @@ export function PixPaymentDialog({
             errorMessage = 'Não foi possível verificar o pagamento. Tente novamente em alguns instantes.';
           }
         }
-        
+
         toast.error(errorMessage, {
           duration: 6000,
           description: 'Se o problema persistir, entre em contato com o suporte.',
@@ -610,7 +638,7 @@ export function PixPaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[95vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-center">Pagamento PIX</DialogTitle>
           <DialogDescription className="text-center">
@@ -618,7 +646,7 @@ export function PixPaymentDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <div className="space-y-4 py-2">
           {/* Valor */}
           <div className="text-center">
             <p className="text-sm text-muted-foreground mb-1">Valor a pagar</p>
@@ -636,25 +664,26 @@ export function PixPaymentDialog({
             </div>
           ) : qrCodeBase64 || qrCode ? (
             <div className="flex flex-col items-center space-y-4">
-              <div className="bg-white p-4 rounded-lg border-2 border-gold/20">
+              <div className="bg-white p-3 rounded-lg border-2 border-gold/20 shadow-sm">
                 {qrCodeBase64 ? (
                   // Se temos imagem base64, usar ela
-                  <img 
-                    src={qrCodeBase64} 
-                    alt="QR Code PIX" 
-                    className="w-64 h-64"
+                  <img
+                    src={qrCodeBase64}
+                    alt="QR Code PIX"
+                    className="w-48 h-48 sm:w-64 sm:h-64 object-contain"
                   />
                 ) : qrCode ? (
                   // Se temos código copy-paste, gerar QR Code
                   <QRCodeSVG
                     value={qrCode}
-                    size={256}
+                    size={200}
                     level="H"
                     includeMargin={true}
+                    className="sm:w-[256px] sm:h-[256px]"
                   />
                 ) : null}
               </div>
-              
+
               {/* Copiar código */}
               <Button
                 variant="outline"
@@ -729,15 +758,15 @@ export function PixPaymentDialog({
           )}
 
           {paymentStatus === 'pending' && paymentId && (
-            <div className="flex flex-col items-center justify-center gap-2 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+            <div className="flex flex-col items-center justify-center gap-1.5 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
               <div className="flex items-center gap-2">
-                <Loader2 className="w-5 h-5 text-amber-500 animate-spin" />
+                <Loader2 className="w-4 h-4 text-amber-500 animate-spin" />
                 <p className="text-sm font-medium text-amber-600">
-                  Aguardando confirmação do pagamento...
+                  Aguardando confirmação...
                 </p>
               </div>
-              <p className="text-xs text-muted-foreground text-center">
-                Verificando automaticamente a cada 5 segundos. Você também pode clicar em "Já paguei" para verificar manualmente.
+              <p className="text-[10px] sm:text-xs text-muted-foreground text-center line-clamp-2 sm:line-clamp-none">
+                Verificando automaticamente a cada 5 segundos.
               </p>
             </div>
           )}

@@ -8,10 +8,14 @@ import { DateTimeSelect } from '@/components/booking/DateTimeSelect';
 import { ClientInfoForm } from '@/components/booking/ClientInfoForm';
 import { PaymentStep } from '@/components/booking/PaymentStep';
 import { SuccessScreen } from '@/components/booking/SuccessScreen';
+import { PixPaymentDialog } from '@/components/booking/PixPaymentDialog';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { ChevronLeft, Sparkles, Loader2, Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { sendTextMessage, checkWhatsAppUser } from '@/lib/whatsapp-api';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 const stepLabels = [
   'Profissional',
@@ -110,6 +114,8 @@ const Index = () => {
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
+  const [showPixDialog, setShowPixDialog] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'online' | 'local'>('local');
 
   // Points earned after booking
   const [earnedPoints, setEarnedPoints] = useState(0);
@@ -122,9 +128,9 @@ const Index = () => {
         // Get tenant_id from URL query string or fetch first tenant
         const urlParams = new URLSearchParams(window.location.search);
         const tenantIdFromUrl = urlParams.get('tenant');
-        
+
         let tenantData;
-        
+
         if (tenantIdFromUrl) {
           // Fetch specific tenant by ID
           const { data } = await supabase
@@ -311,73 +317,243 @@ const Index = () => {
   };
 
   const handlePayment = async (method: 'online' | 'local') => {
-    if (!tenant || !selectedProfessional || !selectedDate || !selectedTime) return;
+    console.log('💳 handlePayment called with method:', method);
+    if (!tenant || !selectedProfessional || !selectedDate || !selectedTime) {
+      console.warn('⚠️ handlePayment: missing required selection data', { tenant: !!tenant, professional: !!selectedProfessional, date: !!selectedDate, time: !!selectedTime });
+      return;
+    }
+
+    setPaymentMethod(method);
+
+    if (method === 'online') {
+      console.log('🔗 [DEBUG] Selected Online (PIX) payment. Setting paymentMethod and showPixDialog=true');
+      setShowPixDialog(true);
+      return;
+    }
+
+    // Se for pagamento local, criar agendamento diretamente
+    console.log('📍 Selected Local payment. Creating appointment...');
+    await createAppointment('local');
+  };
+
+  // Função para criar notificação no painel admin quando pagamento é confirmado
+  const createPaymentNotification = async (
+    tenantId: string,
+    appointmentId: string,
+    clientName: string,
+    amount: number
+  ) => {
+    try {
+      await supabase
+        .from('notifications' as any)
+        .insert({
+          tenant_id: tenantId,
+          type: 'payment_confirmed',
+          title: 'Pagamento Confirmado',
+          message: `Pagamento de R$ ${amount.toFixed(2)} confirmado para o agendamento de ${clientName}`,
+          appointment_id: appointmentId,
+          read: false,
+        });
+
+      console.log('✅ Notificação criada no painel admin');
+    } catch (error) {
+      console.error('❌ Erro ao criar notificação:', error);
+    }
+  };
+
+  // Função para enviar notificações WhatsApp quando pagamento/agendamento é confirmado
+  const sendPaymentConfirmationNotifications = async (
+    tenantId: string,
+    professionalId: string,
+    appointmentDateTime: Date,
+    clientName: string,
+    clientPhone: string,
+    serviceId: string,
+    paymentMethod: 'online' | 'local' = 'online'
+  ) => {
+    try {
+      console.log('📱 [DEBUG] Enviando notificações WhatsApp de confirmação...', { tenantId, professionalId, clientName, clientPhone, paymentMethod });
+
+      // Buscar conexão WhatsApp do tenant
+      const { data: connection, error: connError } = await supabase
+        .from('connections' as any)
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .eq('status', 'online')
+        .maybeSingle() as any;
+
+      if (connError) {
+        console.error('❌ Erro ao buscar conexão WhatsApp (confirmação):', connError);
+        return;
+      }
+
+      if (!connection) {
+        console.log('⚠️ WhatsApp não conectado para este tenant (confirmação)');
+        return;
+      }
+
+      console.log('✅ Conexão WhatsApp encontrada para confirmação:', connection.instance_name);
+
+      // Buscar nomes para a mensagem
+      const { data: professional } = await supabase
+        .from('professionals')
+        .select('nome, telefone')
+        .eq('id', professionalId)
+        .single();
+
+      const { data: service } = await supabase
+        .from('services')
+        .select('nome')
+        .eq('id', serviceId)
+        .single();
+
+      const { data: tenantData } = await supabase
+        .from('tenants')
+        .select('nome')
+        .eq('id', tenantId)
+        .single();
+
+      const barbershopName = tenantData?.nome || 'Barbearia';
+      const serviceName = service?.nome || 'Serviço';
+      const professionalName = professional?.nome || 'Profissional';
+
+      // Formatar data e hora
+      const formattedDate = format(appointmentDateTime, "dd 'de' MMMM", { locale: ptBR });
+      const formattedTime = format(appointmentDateTime, "HH:mm");
+
+      const paymentText = paymentMethod === 'online' ? 'PIX (Online)' : 'No local';
+
+      // Notificar Barbeiro
+      if (professional?.telefone) {
+        const barberMessage = `*${barbershopName}*\n\n` +
+          `Olá ${professionalName}! 👋\n\n` +
+          `✅ *Novo agendamento confirmado!*\n\n` +
+          `📅 *Data:* ${formattedDate}\n` +
+          `🕐 *Horário:* ${formattedTime}\n` +
+          `👤 *Cliente:* ${clientName}\n` +
+          `💇 *Serviço:* ${serviceName}\n` +
+          `💰 *Pagamento:* ${paymentText}\n\n` +
+          `Agendamento confirmado com sucesso!`;
+
+        await sendTextMessage(
+          connection.instance_name,
+          professional.telefone.replace(/\D/g, ''),
+          barberMessage,
+          connection.api_instance_token
+        );
+      }
+
+      // Notificar Cliente
+      const clientMessage = `*${barbershopName}*\n\n` +
+        `Olá ${clientName}! 👋\n\n` +
+        `✅ *Agendamento Confirmado!*\n\n` +
+        `Seu horário foi reservado com sucesso:\n\n` +
+        `📅 *Data:* ${formattedDate}\n` +
+        `🕐 *Horário:* ${formattedTime}\n` +
+        `💇 *Serviço:* ${serviceName}\n` +
+        `👨‍💼 *Profissional:* ${professionalName}\n` +
+        `💰 *Pagamento:* ${paymentText}\n\n` +
+        `Agradecemos a preferência! 🙏`;
+
+      await sendTextMessage(
+        connection.instance_name,
+        clientPhone.replace(/\D/g, ''),
+        clientMessage,
+        connection.api_instance_token
+      );
+
+      console.log('✅ [DEBUG] Notificações enviadas com sucesso');
+    } catch (error) {
+      console.error('❌ [DEBUG] Erro ao enviar notificações:', error);
+    }
+  };
+
+  const createAppointment = async (method: 'online' | 'local', pixId?: string) => {
+    console.log('📝 createAppointment called:', { method, pixId });
+    if (!tenant || !selectedProfessional || !selectedDate || !selectedTime) {
+      console.warn('⚠️ createAppointment: missing required selection data');
+      return;
+    }
 
     try {
-      // Create appointment
       const appointmentDateTime = new Date(selectedDate);
       const [hours, minutes] = selectedTime.split(':');
       appointmentDateTime.setHours(parseInt(hours), parseInt(minutes));
 
-      const { error: appointmentError } = await supabase
+      // Generate confirmation code for online payments
+      let code: string | null = null;
+      let prepaidAmount = 0;
+
+      if (method === 'online') {
+        if (!pixId) {
+          throw new Error('Pagamento PIX não confirmado');
+        }
+        code = Math.floor(1000 + Math.random() * 9000).toString();
+        prepaidAmount = totalPrice * 0.5;
+      }
+
+      const { data: newAppointment, error: appointmentError } = await supabase
         .from('appointments')
         .insert({
           tenant_id: tenant.id,
           professional_id: selectedProfessional,
-          service_id: selectedServices[0], // Primary service
+          service_id: selectedServices[0],
           cliente_nome: clientName,
           cliente_zap: clientPhone,
           data_hora: appointmentDateTime.toISOString(),
           status: 'confirmed',
-        });
+          confirmation_code: code,
+          prepaid_amount: prepaidAmount,
+          pix_payment_id: pixId,
+        })
+        .select()
+        .single();
 
       if (appointmentError) throw appointmentError;
 
-      // Calcular pontos que serão ganhos (mas NÃO lançar ainda)
-      // Os pontos serão lançados automaticamente quando o barbeiro marcar como concluído
+      // Create notification for admin panel
+      if (method === 'online') {
+        await createPaymentNotification(tenant.id, newAppointment.id, clientName, prepaidAmount);
+      }
+
+      // Send WhatsApp notifications
+      await sendPaymentConfirmationNotifications(
+        tenant.id,
+        selectedProfessional,
+        appointmentDateTime,
+        clientName,
+        clientPhone,
+        selectedServices[0],
+        method
+      );
+
+      // Loyalty points logic
       const pointsToAdd = calculatePoints();
       setEarnedPoints(pointsToAdd);
 
-      // Buscar pontos atuais do cliente para exibir na tela de sucesso
-      if (pointsToAdd > 0) {
-        const { data: existingPoints } = await supabase
-          .from('loyalty_points')
-          .select('*')
-          .eq('tenant_id', tenant.id)
-          .eq('cliente_zap', clientPhone)
-          .maybeSingle();
+      const { data: existingPoints } = await supabase
+        .from('loyalty_points')
+        .select('*')
+        .eq('tenant_id', tenant.id)
+        .eq('cliente_zap', clientPhone)
+        .maybeSingle();
 
-        if (existingPoints) {
-          setTotalPoints(existingPoints.pontos || 0);
-        } else {
-          setTotalPoints(0);
-        }
+      setTotalPoints(existingPoints?.pontos || 0);
 
-        // Garantir que o cliente existe na tabela clients
-        const { data: existingClient } = await supabase
-          .from('clients')
-          .select('id')
-          .eq('tenant_id', tenant.id)
-          .eq('telefone', clientPhone)
-          .maybeSingle();
+      // Ensure client exists
+      const { data: existingClient } = await supabase
+        .from('clients')
+        .select('id')
+        .eq('tenant_id', tenant.id)
+        .eq('telefone', clientPhone)
+        .maybeSingle();
 
-        if (!existingClient) {
-          await supabase.from('clients').insert({
-            tenant_id: tenant.id,
-            nome: clientName,
-            telefone: clientPhone,
-          });
-        }
-      } else {
-        // Buscar pontos atuais mesmo sem ganhar novos
-        const { data: existingPoints } = await supabase
-          .from('loyalty_points')
-          .select('*')
-          .eq('tenant_id', tenant.id)
-          .eq('cliente_zap', clientPhone)
-          .maybeSingle();
-
-        setTotalPoints(existingPoints?.pontos || 0);
+      if (!existingClient) {
+        await supabase.from('clients').insert({
+          tenant_id: tenant.id,
+          nome: clientName,
+          telefone: clientPhone,
+        });
       }
 
       setIsSuccess(true);
@@ -401,6 +577,8 @@ const Index = () => {
         loyaltyPoints={totalPoints}
         earnedPoints={earnedPoints}
         loyaltyEnabled={loyaltyConfig?.enabled || false}
+        confirmationCode={null} // Will be updated if needed
+        paymentMethod={paymentMethod}
       />
     );
   }
@@ -418,7 +596,7 @@ const Index = () => {
               <ChevronLeft className="w-6 h-6 text-muted-foreground" />
             </button>
           ) : (
-            <div className="w-10" /> 
+            <div className="w-10" />
           )}
           <DynamicLogo
             logoUrl={tenant?.logo_url || null}
@@ -426,8 +604,8 @@ const Index = () => {
             size="md"
           />
           {!showWizard ? (
-            <a 
-              href="/admin" 
+            <a
+              href="/admin"
               className="text-sm text-gold hover:text-gold-light transition-colors font-medium"
             >
               Entrar
@@ -461,7 +639,7 @@ const Index = () => {
               <p className="text-muted-foreground text-lg mb-8">
                 Agende seu horário em segundos e chegue no estilo que você merece.
               </p>
-              <div className="space-y-3 w-full max-w-xs">
+              <div className="space-y-3 w-full max-w-xs mx-auto">
                 <Button
                   variant="gold"
                   size="xl"
@@ -497,7 +675,7 @@ const Index = () => {
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
-              className="grid grid-cols-3 gap-4 mt-16 max-w-sm"
+              className="grid grid-cols-3 gap-4 mt-16 max-w-sm mx-auto"
             >
               {[
                 { label: 'Rápido', desc: '30 seg' },
@@ -647,6 +825,35 @@ const Index = () => {
           </motion.main>
         )}
       </AnimatePresence>
+
+      {tenant && selectedProfessional && selectedDate && selectedTime && (
+        <PixPaymentDialog
+          open={showPixDialog}
+          onOpenChange={setShowPixDialog}
+          amount={totalPrice * 0.5}
+          description={services
+            .filter((s) => selectedServices.includes(s.id))
+            .map((s) => s.nome)
+            .join(', ')}
+          tenantId={tenant.id}
+          barbershopName={tenant.nome}
+          professionalId={selectedProfessional}
+          serviceId={selectedServices[0]}
+          appointmentDateTime={(() => {
+            const dt = new Date(selectedDate);
+            const [h, m] = selectedTime.split(':');
+            dt.setHours(parseInt(h), parseInt(m));
+            return dt;
+          })()}
+          payerName={clientName}
+          payerPhone={clientPhone}
+          onPaymentSuccess={async (paymentId: string) => {
+            console.log('✅ Pagamento confirmado, atualizando agendamento...', paymentId);
+            await createAppointment('online', paymentId);
+            setShowPixDialog(false);
+          }}
+        />
+      )}
     </div>
   );
 };
